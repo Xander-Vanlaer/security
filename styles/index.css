@@ -1,0 +1,54 @@
+body {
+    font-family: sans-serif;
+    background-color: whitesmoke;
+}
+
+div#container {
+    background-color: #fff;
+    width: 480px;
+    padding: 30px;
+    margin: 125px auto;
+    border-radius: 15px;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
+}
+
+h1 {
+    font-weight: bold;
+    text-align: center;
+    color: dodgerblue;
+}
+
+h3 {
+    font-size: 18px;
+    font-weight: bold;
+    text-align: center;
+}
+
+label {
+    font-weight: bold;
+}
+
+input {
+    margin-bottom: 15px;
+    border-radius: 10px;
+    padding: 10px;
+}
+
+button {
+    background-color: dodgerblue;
+    color: white;
+    border: none;
+    border-radius: 15px;
+    padding: 10px;
+}
+
+button:hover {
+    background-color: white;
+    border: 3px solid dodgerblue;
+    color: dodgerblue;
+}
+
+.invalid {
+    color: red;
+    text-decoration: underline;
+}
