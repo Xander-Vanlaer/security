@@ -1,0 +1,39 @@
+version: "3.9"
+
+services:
+  db:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: waterdb
+      MYSQL_USER: wateruser
+      MYSQL_PASSWORD: waterpass
+    volumes:
+      - dbdata:/var/lib/mysql
+      - ./Database/index.sql:/docker-entrypoint-initdb.d/init.sql
+    restart: always
+
+  api:
+    build: ./api
+    environment:
+      DB_HOST: db
+      DB_USER: wateruser
+      DB_PASS: waterpass
+      DB_NAME: waterdb
+    depends_on:
+      - db
+    restart: always
+
+  nginx:
+    image: nginx:latest
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/index.html:/usr/share/nginx/html/index.html:ro
+    depends_on:
+      - api
+    restart: always
+
+volumes:
+  dbdata:

@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="author" content="Yan Verrept" />
+        <meta name="description" content="This site is for the login screen for the dashboard of the water filter project." />
+        <title>Login</title>
+        <!--<link rel="shortcut icon" href="favicon.ico" type="image/x-icon">-->
+        <link rel="stylesheet" href="styles/bootstrap-reboot.css" />
+        <link rel="stylesheet" href="styles/bootstrap-grid.css" />
+        <link rel="stylesheet" href="styles/index.css" />
+    </head>
+    <body>
+        <div id="container">
+            <h1>Water filter</h1>
+            <h3>Enter your login information</h3>
+            
+            <form id="loginForm" name="loginForm" class="row">
+                <label class="col-1" for="username">Username:</label>
+                <input type="text" id="username" name="username" placeholder="Enter your Username" required />
+                <p id="invalid_user" class="invalid"></p>
+                <label for="password">Password:</label>
+                <input type="text" id="password" name="password" placeholder="Enter your Password" required />
+                <p id="invalid_pass" class="invalid"></p>
+                <button type="submit">Login</button>
+            </form>
+        </div>
+        <script src="javascript/login.js"></script>
+    </body>
+</html>
