@@ -1,52 +1,70 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from contextlib import contextmanager
 import mysql.connector
+from mysql.connector import pooling
 import os
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 class WaterData(BaseModel):
     sensor_value: float
     status: str | None = None
 
-def get_db():
-    return mysql.connector.connect(
-        user=os.environ.get("DB_USER", "wateruser"),
-        password=os.environ.get("DB_PASS", "waterpass"),
-        host=os.environ.get("DB_HOST", "db"),
-        database=os.environ.get("DB_NAME", "waterdb"),
-    )
+db_config = {
+    "user": os.environ.get("DB_USER", "wateruser"),
+    "password": os.environ.get("DB_PASS", "waterpass"),
+    "host": os.environ.get("DB_HOST", "db"),
+    "database": os.environ.get("DB_NAME", "waterdb"),
+}
+
+try:
+    connection_pool = pooling.MySQLConnectionPool(pool_name="waterdb_pool", pool_size=5, **db_config)
+except Exception as e:
+    print(f"Failed to create connection pool: {e}")
+    connection_pool = None
+
+@contextmanager
+def get_db_connection():
+    if connection_pool:
+        conn = connection_pool.get_connection()
+    else:
+        conn = mysql.connector.connect(**db_config)
+    try:
+        yield conn
+    finally:
+        conn.close()
 
 @app.post("/waterdata")
 def insert_data(data: WaterData):
     try:
-        db = get_db()
-        cursor = db.cursor()
-        cursor.execute(
-            """
-            INSERT INTO water_data (sensor_value, status)
-            VALUES (%s, %s)
-            """,
-            (data.sensor_value, data.status)
-        )
-        db.commit()
-        return {"message": "Data inserted"}
+        with get_db_connection() as db:
+            cursor = db.cursor()
+            cursor.execute(
+                "INSERT INTO water_data (sensor_value, status) VALUES (%s, %s)",
+                (data.sensor_value, data.status)
+            )
+            db.commit()
+            return {"message": "Data inserted"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        cursor.close()
-        db.close()
 
 @app.get("/waterdata")
-def get_data():
+def get_data(limit: int = 100):
     try:
-        db = get_db()
-        cursor = db.cursor(dictionary=True)
-        cursor.execute("SELECT * FROM water_data")
-        data = cursor.fetchall()
-        return data
+        with get_db_connection() as db:
+            cursor = db.cursor(dictionary=True)
+            cursor.execute(f"SELECT * FROM water_data ORDER BY timestamp DESC LIMIT {min(limit, 1000)}")
+            data = cursor.fetchall()
+            return data
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        cursor.close()
-        db.close()

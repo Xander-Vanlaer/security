@@ -1,4 +1,3 @@
-version: "3.9"
 
 services:
   db:
@@ -12,9 +11,11 @@ services:
       - dbdata:/var/lib/mysql
       - ./Database/index.sql:/docker-entrypoint-initdb.d/init.sql
     restart: always
-
+ # curl -X POST http://localhost:8000/waterdata -H "Content-Type: application/json" -d '{"sensor_value": 47.5, "status": "healthy"}'
   api:
-    build: ./api
+    build: ./API
+    ports:
+      - "8000:8000"
     environment:
       DB_HOST: db
       DB_USER: wateruser
