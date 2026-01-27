@@ -5,6 +5,7 @@ from contextlib import contextmanager
 import mysql.connector
 from mysql.connector import pooling
 import os
+import bcrypt
 
 app = FastAPI()
 
@@ -74,18 +75,16 @@ def get_data(limit: int = 100):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/login")
-def login():
-    return {"message": "Login endpoint - to be implemented"}
-
 @app.post("/users")
 def create_user(user: User):
     try:
+        # Hash password with bcrypt
+        password_hash = bcrypt.hashpw(user.password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
         with get_db_connection() as db:
             cursor = db.cursor()
             cursor.execute(
                 "INSERT INTO users (username, password_hash) VALUES (%s, %s)",
-                (user.username, user.password)
+                (user.username, password_hash)
             )
             db.commit()
             return {"message": "User created", "username": user.username}
@@ -102,5 +101,26 @@ def get_users():
             cursor.execute("SELECT id, username, created_at FROM users")
             users = cursor.fetchall()
             return users
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/login")
+def login(user: User):
+    try:
+        with get_db_connection() as db:
+            cursor = db.cursor(dictionary=True)
+            cursor.execute("SELECT password_hash FROM users WHERE username = %s", (user.username,))
+            result = cursor.fetchone()
+            
+            if not result:
+                raise HTTPException(status_code=401, detail="Invalid username or password")
+            
+            # Verify password against hash
+            if bcrypt.checkpw(user.password.encode('utf-8'), result['password_hash'].encode('utf-8')):
+                return {"message": "Login successful", "username": user.username}
+            else:
+                raise HTTPException(status_code=401, detail="Invalid username or password")
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

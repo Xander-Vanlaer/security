@@ -17,3 +17,6 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 CREATE INDEX IF NOT EXISTS idx_status ON water_data(status);
+-- Insert developer account (password: "developer")
+INSERT IGNORE INTO users (username, password_hash) 
+VALUES ('developer', '$2b$12$f752pp5dO/ZT9lWdK8JlnO4ciW9B4cTsrDp2gFO0xWot9uaO4yRA6');
