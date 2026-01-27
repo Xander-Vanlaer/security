@@ -31,8 +31,7 @@ document.getElementById("loginForm").addEventListener("submit", async function (
     
     const buttonState = event.submitter;
     const state = buttonState.value;
-    const list_users = ["Yan", "Toon", "Yannick", "Xander"];
-    const list_passwords = ["231204yv", "test123!", "abc123!", "password"];
+
     const username = document.getElementById("username").value;
     const password = document.getElementById("password").value;
     const p_username = document.getElementById("invalid_user");
