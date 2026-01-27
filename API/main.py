@@ -16,9 +16,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-class WaterData(BaseModel):
-    sensor_value: float
-    status: str | None = None
+class User(BaseModel):
+    username: str
+    password: str
 
 db_config = {
     "user": os.environ.get("DB_USER", "wateruser"),
@@ -50,8 +50,8 @@ def insert_data(data: WaterData):
         with get_db_connection() as db:
             cursor = db.cursor()
             cursor.execute(
-                "INSERT INTO water_data (sensor_value, status) VALUES (%s, %s)",
-                (data.sensor_value, data.status)
+                "INSERT INTO water_data (sensor_value, status, location) VALUES (%s, %s, %s)",
+                (data.sensor_value, data.status, data.location)
             )
             db.commit()
             return {"message": "Data inserted"}
@@ -66,5 +66,36 @@ def get_data(limit: int = 100):
             cursor.execute(f"SELECT * FROM water_data ORDER BY timestamp DESC LIMIT {min(limit, 1000)}")
             data = cursor.fetchall()
             return data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/login")
+def login():
+    return {"message": "Login endpoint - to be implemented"}
+
+@app.post("/users")
+def create_user(user: User):
+    try:
+        with get_db_connection() as db:
+            cursor = db.cursor()
+            cursor.execute(
+                "INSERT INTO users (username, password_hash) VALUES (%s, %s)",
+                (user.username, user.password)
+            )
+            db.commit()
+            return {"message": "User created", "username": user.username}
+    except mysql.connector.Error as e:
+        if e.errno == 1062:
+            raise HTTPException(status_code=400, detail="Username already exists")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/users")
+def get_users():
+    try:
+        with get_db_connection() as db:
+            cursor = db.cursor(dictionary=True)
+            cursor.execute("SELECT id, username, created_at FROM users")
+            users = cursor.fetchall()
+            return users
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

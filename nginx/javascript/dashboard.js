@@ -1,7 +1,7 @@
 const API_URL = '/api';
 const COLUMNS = ['column-1', 'column-2', 'column-3', 'column-4', 'column-5', 'column-6'];
 const REFRESH_INTERVAL = 5000;
-const CARD_STYLES = `background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 8px; margin: 10px 0; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); min-height: 150px; display: flex; flex-direction: column; justify-content: center;`;
+const CARD_STYLES = `background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 8px; margin: 10px 0; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); height: 280px; display: flex; flex-direction: column;`;
 
 let refreshTimer = null;
 
@@ -37,7 +37,7 @@ function createFlashcard(data) {
     const card = document.createElement('div');
     card.className = 'flashcard';
     card.style.cssText = CARD_STYLES;
-    card.innerHTML = `<h3 style="margin: 0 0 10px 0; font-size: 18px;">Water Data</h3><div style="font-size: 14px; line-height: 1.6;"><p><strong>ID:</strong> ${data.id || 'N/A'}</p><p><strong>Value:</strong> ${data.sensor_value || 'N/A'}</p><p><strong>Status:</strong> ${data.status || 'N/A'}</p><p style="font-size: 12px; opacity: 0.8; margin-top: 10px;">${new Date(data.timestamp).toLocaleString()}</p></div>`;
+    card.innerHTML = `<h3 style="margin: 0 0 10px 0; font-size: 18px;">Water Data</h3><div style="font-size: 14px; line-height: 1.6;"><p><strong>ID:</strong> ${data.id || 'N/A'}</p><p><strong>Location:</strong> ${data.location || 'N/A'}</p><p><strong>Quality:</strong> ${data.sensor_value || 'N/A'}/10</p><p><strong>Status:</strong> ${data.status || 'N/A'}</p><p style="font-size: 12px; opacity: 0.8; margin-top: 10px;">${new Date(data.timestamp).toLocaleString()}</p></div>`;
     return card;
 }
 
@@ -46,13 +46,13 @@ function displayMessage(message) {
     if (column) column.innerHTML = `<p style="color: #666; padding: 20px; text-align: center;">${message}</p>`;
 }
 
-async function submitSensorData(sensorValue, status) {
+async function submitSensorData(sensorValue, status, location) {
     const messageEl = document.getElementById('formMessage');
     try {
         const response = await fetch(`${API_URL}/waterdata`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ sensor_value: parseFloat(sensorValue), status })
+            body: JSON.stringify({ sensor_value: parseFloat(sensorValue), status, location })
         });
         
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -87,7 +87,8 @@ if (document.readyState === 'loading') {
             e.preventDefault();
             const sensorValue = document.getElementById('sensorValue').value;
             const status = document.getElementById('statusSelect').value;
-            if (sensorValue && status) submitSensorData(sensorValue, status);
+            const location = document.getElementById('location').value;
+            if (sensorValue && status && location) submitSensorData(sensorValue, status, location);
         });
     });
 } else {
@@ -96,7 +97,8 @@ if (document.readyState === 'loading') {
         e.preventDefault();
         const sensorValue = document.getElementById('sensorValue').value;
         const status = document.getElementById('statusSelect').value;
-        if (sensorValue && status) submitSensorData(sensorValue, status);
+        const location = document.getElementById('location').value;
+        if (sensorValue && status && location) submitSensorData(sensorValue, status, location);
     });
 }
 

@@ -25,10 +25,19 @@
                         <h3 style="margin-top: 0;">Add Sensor Data</h3>
                         <form id="sensorForm" style="display: flex; gap: 10px; flex-wrap: wrap;">
                             <input 
+                                type="text" 
+                                id="location" 
+                                placeholder="Location" 
+                                required
+                                style="flex: 1; min-width: 120px; padding: 8px; border: 1px solid #ddd; border-radius: 4px;"
+                            />
+                            <input 
                                 type="number" 
                                 id="sensorValue" 
-                                placeholder="Sensor Value" 
+                                placeholder="Quality (0-10)" 
                                 step="0.1"
+                                min="0"
+                                max="10"
                                 required
                                 style="flex: 1; min-width: 150px; padding: 8px; border: 1px solid #ddd; border-radius: 4px;"
                             />
