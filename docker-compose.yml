@@ -31,7 +31,8 @@ services:
       - "80:80"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx:/usr/share/nginx/html:ro
+      - ./nginx:/usr/share/nginx/html
+      - ./javascript:/usr/share/nginx/html/javascript
     depends_on:
       - api
     restart: always
