@@ -20,6 +20,11 @@ class User(BaseModel):
     username: str
     password: str
 
+class WaterData(BaseModel):
+    sensor_value: float
+    status: str
+    location: str
+
 db_config = {
     "user": os.environ.get("DB_USER", "wateruser"),
     "password": os.environ.get("DB_PASS", "waterpass"),
