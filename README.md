@@ -1,6 +1,6 @@
-# Secure Full-Stack Application
+# Secure Full-Stack Application with RBAC
 
-A production-ready, secure web application featuring Docker containerization, FastAPI backend, PostgreSQL database, Redis session management, and comprehensive 2FA authentication.
+A production-ready, secure web application featuring Docker containerization, FastAPI backend, PostgreSQL database, Redis session management, comprehensive 2FA authentication, and role-based access control (RBAC) for hospital/region management with IoT sensor data ingestion.
 
 ## 🌟 Features
 
@@ -16,6 +16,14 @@ A production-ready, secure web application featuring Docker containerization, Fa
 - ✅ **Account Lockout** - Temporary lockout after failed login attempts
 - ✅ **Password Complexity** - Enforced password requirements
 - ✅ **Environment-based Secrets** - No hardcoded credentials
+- ✅ **API Key Authentication** - Secure sensor data ingestion with API keys
+
+### RBAC Features
+- 🔐 **Role-Based Access Control** - 4 user roles with different permissions
+- 🏥 **Hospital Management** - Manage hospitals and assign users
+- 🌍 **Region Management** - Regional organization with region admins
+- 📊 **IoT Sensor Integration** - Secure API for Orange Pi sensor data ingestion
+- 📈 **Dashboard Analytics** - Role-filtered statistics and visualizations
 
 ### Technical Features
 - 🐳 **Docker Containerization** - Complete multi-container setup
@@ -26,6 +34,32 @@ A production-ready, secure web application featuring Docker containerization, Fa
 - 🔍 **Health Checks** - Service monitoring and orchestration
 - 📱 **Responsive Design** - Mobile-friendly frontend
 - ⚡ **Async/Await** - High-performance async operations
+
+## 👥 User Roles
+
+The application supports 4 user roles with hierarchical permissions:
+
+| Role | Level | Description | Permissions |
+|------|-------|-------------|-------------|
+| **Pending** | 1 | New registered users | Read-only access to profile, pending admin approval |
+| **Admin** | 2 | System administrators | Full access to all features, user/region/hospital management |
+| **Region Admin** | 3 | Regional managers | Manage users and hospitals within assigned region, view regional sensor data |
+| **Hospital User** | 4 | Hospital staff | View sensor data only for assigned hospital, read-only access |
+
+### Permissions Matrix
+
+| Feature | Pending | Admin | Region Admin | Hospital User |
+|---------|---------|-------|--------------|---------------|
+| View own profile | ✅ | ✅ | ✅ | ✅ |
+| Enable 2FA | ✅ | ✅ | ✅ | ✅ |
+| Create regions | ❌ | ✅ | ❌ | ❌ |
+| Create hospitals | ❌ | ✅ | ❌ | ❌ |
+| Manage API keys | ❌ | ✅ | ❌ | ❌ |
+| Update user roles | ❌ | ✅ | ❌ | ❌ |
+| Assign users to regions | ❌ | ✅ | ❌ | ❌ |
+| Assign users to hospitals | ❌ | ✅ | ✅ (in region) | ❌ |
+| View all sensor data | ❌ | ✅ | ✅ (in region) | ✅ (own hospital) |
+| Ingest sensor data (API) | ❌ | ✅ (via API key) | ✅ (via API key) | ✅ (via API key) |
 
 ## 📋 Prerequisites
 
@@ -92,6 +126,19 @@ The setup script will:
    docker compose exec backend alembic upgrade head
    ```
 
+5. **Seed sample data (Optional but recommended)**
+   ```bash
+   docker compose exec backend python seed_data.py
+   ```
+   
+   This will create:
+   - Admin user (username: `admin`, password: `Admin123!`)
+   - 3 regions (North, South, East)
+   - 6 hospitals across regions
+   - API keys for each hospital
+   - Sample sensor data
+   - Sample users for each role
+
 ## 🌐 Access the Application
 
 After successful setup:
@@ -112,7 +159,19 @@ After successful setup:
    - Email address
    - Password (min 8 characters, must include uppercase, lowercase, and numbers)
 4. Click **"Register"**
-5. You'll be redirected to login
+5. You'll see a message about pending approval
+6. **New users start as "Pending" (role 1)** - Contact admin to get role assigned
+
+### Sample User Accounts (after running seed_data.py)
+
+| Username | Password | Role |
+|----------|----------|------|
+| admin | Admin123! | Admin |
+| region_admin_north | RegionAdmin123! | Region Admin (North) |
+| region_admin_south | RegionAdmin123! | Region Admin (South) |
+| hospital_user_ngh | Hospital123! | Hospital User (North General Hospital) |
+| hospital_user_srh | Hospital123! | Hospital User (South Regional Hospital) |
+| pending_user | Pending123! | Pending |
 
 ### Logging In
 
@@ -120,6 +179,7 @@ After successful setup:
 2. Click **"Login"**
 3. If 2FA is enabled, enter your 6-digit code
 4. You'll be redirected to the dashboard
+5. Dashboard content varies by role (Pending, Admin, Region Admin, Hospital User)
 
 ### Enabling 2FA
 
@@ -153,6 +213,46 @@ After successful setup:
 | POST | `/api/auth/refresh` | Refresh access token | No |
 | POST | `/api/auth/logout` | Logout | Yes |
 
+### Admin Endpoints (Admin role only)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/admin/users/{user_id}/role` | Update user role |
+| POST | `/api/admin/users/{user_id}/assign` | Assign user to region/hospital |
+| GET | `/api/admin/users` | List all users (with filters) |
+| GET | `/api/admin/regions` | List all regions |
+| POST | `/api/admin/regions` | Create new region |
+| GET | `/api/admin/hospitals` | List all hospitals |
+| POST | `/api/admin/hospitals` | Create new hospital |
+| POST | `/api/admin/api-keys` | Generate API key for hospital |
+| DELETE | `/api/admin/api-keys/{key_id}` | Revoke API key |
+| GET | `/api/admin/api-keys` | List all API keys |
+
+### Region Admin Endpoints (Region Admin or Admin roles)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/region/users` | List users in my region |
+| POST | `/api/region/users/{user_id}/assign-hospital` | Assign user to hospital in region |
+| GET | `/api/region/hospitals` | List hospitals in my region |
+| GET | `/api/region/sensor-data` | Get sensor data for my region |
+
+### Sensor Data Endpoints
+
+| Method | Endpoint | Description | Authentication |
+|--------|----------|-------------|----------------|
+| POST | `/api/sensors/data` | Ingest sensor data | API Key (X-API-Key header) |
+| GET | `/api/sensors/data` | Get sensor data (role-filtered) | JWT Bearer Token |
+| GET | `/api/sensors/data/{hospital_id}` | Get sensor data for specific hospital | JWT Bearer Token |
+| GET | `/api/sensors/latest` | Get latest sensor readings | JWT Bearer Token |
+
+### Dashboard Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/dashboard/stats` | Get dashboard statistics (role-filtered) |
+| GET | `/api/dashboard/sensor-data` | Get sensor data for dashboard |
+
 ### Data Endpoints
 
 | Method | Endpoint | Description | Authentication |
@@ -168,6 +268,121 @@ After successful setup:
 |--------|----------|-------------|
 | GET | `/health` | Health check |
 | GET | `/` | API information |
+
+## 🌡️ IoT Sensor Integration (Orange Pi)
+
+### Generating API Keys
+
+1. Login as **Admin**
+2. Navigate to admin dashboard
+3. Create a hospital (if not exists)
+4. Generate API key for the hospital
+5. Save the API key securely (shown only once)
+
+Alternatively, using the API:
+
+```bash
+# Login and get access token
+curl -X POST http://localhost:8000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username": "admin", "password": "Admin123!"}'
+
+# Create API key (replace {hospital_id} and {access_token})
+curl -X POST http://localhost:8000/api/admin/api-keys \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer {access_token}" \
+  -d '{"hospital_id": 1, "description": "Orange Pi Sensor 001"}'
+```
+
+### Sending Sensor Data from Orange Pi
+
+**Python Example:**
+
+```python
+import requests
+import json
+from datetime import datetime
+
+API_URL = "http://your-server:8000/api/sensors/data"
+API_KEY = "sk_your_generated_api_key_here"
+
+# Sample sensor reading
+sensor_data = {
+    "sensor_id": "OPI-001",
+    "timestamp": datetime.utcnow().isoformat() + "Z",
+    "temperature": 22.5,
+    "humidity": 45.2,
+    "air_quality": 85,
+    "custom_data": {
+        "co2": 400,
+        "pressure": 1013,
+        "location": "Ward A"
+    }
+}
+
+headers = {
+    "X-API-Key": API_KEY,
+    "Content-Type": "application/json"
+}
+
+response = requests.post(API_URL, json=sensor_data, headers=headers)
+
+if response.status_code == 201:
+    print("Sensor data uploaded successfully!")
+    print(response.json())
+else:
+    print(f"Error: {response.status_code}")
+    print(response.text)
+```
+
+**cURL Example:**
+
+```bash
+curl -X POST http://localhost:8000/api/sensors/data \
+  -H "X-API-Key: sk_your_generated_api_key_here" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "sensor_id": "OPI-001",
+    "timestamp": "2026-01-28T10:30:00Z",
+    "temperature": 22.5,
+    "humidity": 45.2,
+    "air_quality": 85,
+    "custom_data": {
+      "co2": 400,
+      "pressure": 1013
+    }
+  }'
+```
+
+### Sensor Data Schema
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `sensor_id` | string | Yes | Unique identifier for the sensor |
+| `timestamp` | datetime | No | Timestamp of reading (UTC, defaults to now) |
+| `temperature` | float | No | Temperature in Celsius |
+| `humidity` | float | No | Humidity percentage |
+| `air_quality` | float | No | Air quality index |
+| `custom_data` | object | No | Additional sensor data as JSON |
+
+**Note:** All sensor data is stored in `data_json` field. Standard fields (temperature, humidity, air_quality) are also available as separate columns for easier querying.
+
+### Rate Limiting
+
+- **Sensor API**: 100 requests per minute per API key
+- Exceeding rate limits returns HTTP 429 (Too Many Requests)
+
+### Retrieving Sensor Data
+
+```bash
+# Get latest sensor data for your hospital (as hospital user)
+curl -X GET http://localhost:8000/api/sensors/latest \
+  -H "Authorization: Bearer {your_jwt_token}"
+
+# Get sensor data with filters (as admin/region admin)
+curl -X GET "http://localhost:8000/api/sensors/data?hospital_id=1&limit=50" \
+  -H "Authorization: Bearer {your_jwt_token}"
+```
 
 ## 🔐 Environment Variables
 
