@@ -5,6 +5,56 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard - Secure App</title>
     <link rel="stylesheet" href="css/style.css">
+    <style>
+        .stat-item {
+            background: #f5f5f5;
+            padding: 1rem;
+            border-radius: 8px;
+            text-align: center;
+            margin: 0.5rem;
+        }
+        .stat-number {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #4CAF50;
+            margin: 0.5rem 0;
+        }
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+        .data-table th,
+        .data-table td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        .data-table th {
+            background-color: #f5f5f5;
+            font-weight: 600;
+        }
+        .data-table tr:hover {
+            background-color: #f9f9f9;
+        }
+        .list-item {
+            padding: 0.75rem;
+            border-bottom: 1px solid #eee;
+        }
+        .list-item:last-child {
+            border-bottom: none;
+        }
+        .btn-small {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.875rem;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+    </style>
 </head>
 <body>
     <nav class="navbar">
@@ -50,7 +100,78 @@
                 </div>
             </div>
             
-            <div class="card">
+            <!-- Pending User Section -->
+            <div id="pending-user-section" class="card" style="display: none;">
+                <h2>Account Pending Approval</h2>
+                <div style="padding: 2rem; text-align: center;">
+                    <p style="font-size: 1.1rem; margin-bottom: 1rem;">Your account is pending approval.</p>
+                    <p>Please contact an administrator to activate your account:</p>
+                    <p><strong>Email:</strong> <a href="mailto:admin@example.com">admin@example.com</a></p>
+                    <p style="margin-top: 1rem; color: #888;">You currently have read-only access to your profile.</p>
+                </div>
+            </div>
+            
+            <!-- Admin Dashboard Section -->
+            <div id="admin-section" style="display: none;">
+                <div class="card">
+                    <h2>Admin Dashboard</h2>
+                    <div id="admin-stats" class="stats-grid"></div>
+                </div>
+                
+                <div class="card">
+                    <h2>User Management</h2>
+                    <div id="admin-users-list"></div>
+                </div>
+                
+                <div class="card">
+                    <h2>Regions</h2>
+                    <div id="regions-list"></div>
+                </div>
+                
+                <div class="card">
+                    <h2>Hospitals</h2>
+                    <div id="hospitals-list"></div>
+                </div>
+            </div>
+            
+            <!-- Region Admin Dashboard Section -->
+            <div id="region-admin-section" style="display: none;">
+                <div class="card">
+                    <h2>Region Admin Dashboard</h2>
+                    <div id="region-admin-stats" class="stats-grid"></div>
+                </div>
+                
+                <div class="card">
+                    <h2>Users in Your Region</h2>
+                    <div id="region-users-list"></div>
+                </div>
+                
+                <div class="card">
+                    <h2>Hospitals in Your Region</h2>
+                    <div id="region-hospitals-list"></div>
+                </div>
+                
+                <div class="card">
+                    <h2>Recent Sensor Data</h2>
+                    <div id="region-sensor-data"></div>
+                </div>
+            </div>
+            
+            <!-- Hospital User Dashboard Section -->
+            <div id="hospital-user-section" style="display: none;">
+                <div class="card">
+                    <h2>Hospital Dashboard</h2>
+                    <div id="hospital-stats" class="stats-grid"></div>
+                </div>
+                
+                <div class="card">
+                    <h2>Sensor Data for Your Hospital</h2>
+                    <div id="hospital-sensor-data"></div>
+                </div>
+            </div>
+            
+            <!-- Data Management (for all users except pending) -->
+            <div id="data-management" class="card" style="display: none;">
                 <h2>Your Data</h2>
                 <button id="add-data-btn" class="btn btn-primary">Add New Item</button>
                 

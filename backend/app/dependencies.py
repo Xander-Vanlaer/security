@@ -1,13 +1,14 @@
 """
 FastAPI dependencies for authentication and authorization
 """
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Header
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.models import User
+from app.models import User, APIKey
 from app.auth import verify_token
 from typing import Optional
+from datetime import datetime
 
 security = HTTPBearer()
 
@@ -43,3 +44,58 @@ async def get_current_user(
 async def get_current_active_user(current_user: User = Depends(get_current_user)) -> User:
     """Get current active user (can add additional checks here)"""
     return current_user
+
+
+def require_role(min_role: int):
+    """Decorator to require minimum role level"""
+    async def role_checker(current_user: User = Depends(get_current_active_user)):
+        if current_user.role < min_role:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Insufficient permissions"
+            )
+        return current_user
+    return role_checker
+
+
+async def require_admin(current_user: User = Depends(get_current_active_user)):
+    """Require admin role (role 2)"""
+    if current_user.role != 2:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required"
+        )
+    return current_user
+
+
+async def require_region_admin_or_admin(current_user: User = Depends(get_current_active_user)):
+    """Require region admin or higher"""
+    if current_user.role < 2 or current_user.role > 3:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Region admin or admin access required"
+        )
+    return current_user
+
+
+async def verify_api_key(
+    x_api_key: str = Header(...),
+    db: Session = Depends(get_db)
+) -> APIKey:
+    """Verify API key for sensor endpoints"""
+    api_key = db.query(APIKey).filter(
+        APIKey.key == x_api_key,
+        APIKey.is_active == True
+    ).first()
+    
+    if not api_key:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid API key"
+        )
+    
+    # Update last used timestamp
+    api_key.last_used = datetime.utcnow()
+    db.commit()
+    
+    return api_key

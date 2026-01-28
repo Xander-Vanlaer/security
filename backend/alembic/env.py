@@ -10,7 +10,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from app.database import Base
-from app.models import User, DataItem
+from app.models import User, DataItem, Region, Hospital, SensorData, APIKey
 from app.config import get_settings
 
 # this is the Alembic Config object

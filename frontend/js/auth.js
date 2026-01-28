@@ -241,15 +241,21 @@ if (window.location.pathname.includes('login.html')) {
                     throw new Error(data.detail || 'Registration failed');
                 }
                 
-                successDiv.textContent = 'Registration successful! Please login.';
+                // Show pending account message
+                successDiv.innerHTML = `
+                    <strong>Account created!</strong><br>
+                    You have limited access. Please contact an administrator at 
+                    <a href="mailto:admin@example.com">admin@example.com</a> 
+                    to activate your account.
+                `;
                 successDiv.style.display = 'block';
                 registerForm.reset();
                 
-                // Switch to login form after 2 seconds
+                // Switch to login form after 5 seconds
                 setTimeout(() => {
                     registerCard.style.display = 'none';
                     loginCard.style.display = 'block';
-                }, 2000);
+                }, 5000);
             } catch (error) {
                 errorDiv.textContent = error.message;
                 errorDiv.style.display = 'block';
