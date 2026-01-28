@@ -979,6 +979,9 @@ async function loadAllowedDomains() {
         }
         
         listElement.innerHTML = `
+            <p style="margin-bottom: 1rem; color: #666;">
+                <strong>Note:</strong> You can whitelist specific emails (e.g., user@example.com) or entire domains (e.g., @example.com)
+            </p>
             <table class="data-table">
                 <thead>
                     <tr>

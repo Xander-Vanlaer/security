@@ -25,7 +25,9 @@ def add_mock_data():
             "manager.lisa@regional.health",
             "analyst.tom@data.med",
             "supervisor.emma@care.center",
-            "operator.david@sensor.systems"
+            "operator.david@sensor.systems",
+            "@test.com",  # Domain whitelist example
+            "@gmail.com"  # Domain whitelist example
         ]
         
         added_count = 0
