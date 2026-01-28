@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Secure App</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <h1>Secure Application</h1>
+            <div class="nav-actions">
+                <span id="user-info"></span>
+                <button id="logout-btn" class="btn btn-secondary">Logout</button>
+            </div>
+        </div>
+    </nav>
+    
+    <div class="container">
+        <div class="dashboard">
+            <div class="card">
+                <h2>User Information</h2>
+                <div id="user-details"></div>
+            </div>
+            
+            <div class="card">
+                <h2>Two-Factor Authentication</h2>
+                <div id="2fa-section">
+                    <div id="2fa-disabled" style="display: none;">
+                        <p>Two-factor authentication is currently disabled.</p>
+                        <button id="enable-2fa-btn" class="btn btn-primary">Enable 2FA</button>
+                    </div>
+                    
+                    <div id="2fa-enabled" style="display: none;">
+                        <p>Two-factor authentication is enabled for your account.</p>
+                        <button id="disable-2fa-btn" class="btn btn-danger">Disable 2FA</button>
+                    </div>
+                    
+                    <div id="2fa-setup" style="display: none;">
+                        <h3>Set up 2FA</h3>
+                        <p>Scan this QR code with your authenticator app (Google Authenticator, Authy, etc.)</p>
+                        <div id="qr-code-container"></div>
+                        <div class="form-group">
+                            <label>Manual entry code (if you can't scan):</label>
+                            <code id="totp-secret"></code>
+                        </div>
+                        <button id="close-2fa-setup" class="btn btn-secondary">Close</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h2>Your Data</h2>
+                <button id="add-data-btn" class="btn btn-primary">Add New Item</button>
+                
+                <div id="add-data-form" style="display: none; margin-top: 1rem;">
+                    <div class="form-group">
+                        <label for="data-title">Title</label>
+                        <input type="text" id="data-title" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="data-content">Content</label>
+                        <textarea id="data-content" rows="4" required></textarea>
+                    </div>
+                    <button id="save-data-btn" class="btn btn-success">Save</button>
+                    <button id="cancel-data-btn" class="btn btn-secondary">Cancel</button>
+                </div>
+                
+                <div id="data-list"></div>
+                <div id="error-message" class="error-message" style="display: none;"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="js/auth.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
