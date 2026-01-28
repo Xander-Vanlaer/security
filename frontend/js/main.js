@@ -1298,6 +1298,19 @@ function setupAdminEventListeners() {
             return;
         }
         
+        // More robust validation
+        const emailParts = email.split('@');
+        if (emailParts.length !== 2 || !emailParts[1]) {
+            showError('Invalid format. Use email@domain.com or @domain.com');
+            return;
+        }
+        
+        // For domain format, ensure there's content after @
+        if (emailParts[0] === '' && !emailParts[1].includes('.')) {
+            showError('Domain must include a TLD (e.g., @domain.com)');
+            return;
+        }
+        
         try {
             await apiClient.request('/api/admin/allowed-emails', {
                 method: 'POST',

@@ -152,7 +152,6 @@ def seed_data():
         # Create sample sensor data
         print("\nCreating sample sensor data...")
         sensor_count = 0
-        import random
         
         # Generate realistic sensor data for the last 7 days
         for hospital in hospitals:
