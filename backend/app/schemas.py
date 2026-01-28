@@ -105,6 +105,12 @@ class RegionCreate(BaseModel):
     code: str = Field(..., min_length=1, max_length=20)
 
 
+class RegionUpdate(BaseModel):
+    """Schema for updating a region"""
+    name: Optional[str] = Field(None, min_length=1, max_length=100)
+    code: Optional[str] = Field(None, min_length=1, max_length=20)
+
+
 class RegionResponse(BaseModel):
     """Schema for region response"""
     id: int
@@ -122,6 +128,14 @@ class HospitalCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=200)
     code: str = Field(..., min_length=1, max_length=50)
     region_id: int
+    address: Optional[str] = None
+
+
+class HospitalUpdate(BaseModel):
+    """Schema for updating a hospital"""
+    name: Optional[str] = Field(None, min_length=1, max_length=200)
+    code: Optional[str] = Field(None, min_length=1, max_length=50)
+    region_id: Optional[int] = None
     address: Optional[str] = None
 
 
@@ -202,3 +216,27 @@ class DataItemResponse(BaseModel):
     
     class Config:
         from_attributes = True
+
+
+# Sensor Overview Schemas
+class SensorOverviewResponse(BaseModel):
+    """Schema for sensor overview with statistics"""
+    sensor_id: str
+    hospital_id: int
+    hospital_name: str
+    region_id: int
+    region_name: str
+    last_reading_timestamp: datetime
+    temperature: Optional[float]
+    humidity: Optional[float]
+    air_quality: Optional[float]
+    is_active: bool
+    total_readings: int
+
+
+class SensorStatsResponse(BaseModel):
+    """Schema for system-wide sensor statistics"""
+    total_sensors: int
+    active_sensors: int
+    inactive_sensors: int
+    readings_last_24h: int

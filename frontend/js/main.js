@@ -119,9 +119,13 @@ async function showAdminDashboard() {
     if (section) {
         section.style.display = 'block';
         await loadAdminStats();
+        await loadSensorStats();
+        await loadSensorsOverview();
         await loadAdminUsers();
         await loadRegions();
         await loadHospitals();
+        await loadAPIKeys();
+        setupAdminEventListeners();
     }
 }
 
@@ -228,13 +232,78 @@ async function loadRegions() {
         const regions = await apiClient.request('/api/admin/regions');
         const regionsList = document.getElementById('regions-list');
         
-        regionsList.innerHTML = regions.map(region => `
-            <div class="list-item">
-                <strong>${escapeHtml(region.name)}</strong> (${escapeHtml(region.code)})
-            </div>
-        `).join('') || '<p>No regions found.</p>';
+        if (!regions || regions.length === 0) {
+            regionsList.innerHTML = '<p>No regions found.</p>';
+            return;
+        }
+        
+        regionsList.innerHTML = `
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Name</th>
+                        <th>Code</th>
+                        <th>Created</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${regions.map(region => `
+                        <tr>
+                            <td>${region.id}</td>
+                            <td><strong>${escapeHtml(region.name)}</strong></td>
+                            <td><code>${escapeHtml(region.code)}</code></td>
+                            <td>${new Date(region.created_at).toLocaleDateString()}</td>
+                            <td>
+                                <button class="btn btn-small btn-primary" onclick="editRegion(${region.id})">Edit</button>
+                                <button class="btn btn-small btn-danger" onclick="deleteRegion(${region.id})">Delete</button>
+                            </td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        `;
+        
+        // Populate dropdowns after loading regions
+        await populateRegionDropdowns();
     } catch (error) {
         console.error('Failed to load regions:', error);
+    }
+}
+
+// Edit region - global function for onclick
+async function editRegion(regionId) {
+    try {
+        const regions = await apiClient.request('/api/admin/regions');
+        const region = regions.find(r => r.id === regionId);
+        
+        if (!region) {
+            showError('Region not found');
+            return;
+        }
+        
+        document.getElementById('edit-region-id').value = regionId;
+        document.getElementById('edit-region-name').value = region.name;
+        document.getElementById('edit-region-code').value = region.code;
+        document.getElementById('edit-region-form').style.display = 'block';
+    } catch (error) {
+        showError('Failed to load region: ' + error.message);
+    }
+}
+
+// Delete region - global function for onclick
+async function deleteRegion(regionId) {
+    if (!confirm('Are you sure you want to delete this region? This will fail if there are hospitals or users assigned to it.')) {
+        return;
+    }
+    
+    try {
+        await apiClient.request(`/api/admin/regions/${regionId}`, { method: 'DELETE' });
+        showSuccess('Region deleted successfully');
+        await loadRegions();
+    } catch (error) {
+        showError('Failed to delete region: ' + error.message);
     }
 }
 
@@ -242,15 +311,74 @@ async function loadRegions() {
 async function loadHospitals() {
     try {
         const hospitals = await apiClient.request('/api/admin/hospitals');
+        const regions = await apiClient.request('/api/admin/regions');
         const hospitalsList = document.getElementById('hospitals-list');
         
-        hospitalsList.innerHTML = hospitals.map(hospital => `
-            <div class="list-item">
-                <strong>${escapeHtml(hospital.name)}</strong> (${escapeHtml(hospital.code)}) - Region ID: ${hospital.region_id}
-            </div>
-        `).join('') || '<p>No hospitals found.</p>';
+        if (!hospitals || hospitals.length === 0) {
+            hospitalsList.innerHTML = '<p>No hospitals found.</p>';
+            return;
+        }
+        
+        hospitalsList.innerHTML = `
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Name</th>
+                        <th>Code</th>
+                        <th>Region</th>
+                        <th>Address</th>
+                        <th>Created</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${hospitals.map(hospital => {
+                        const region = regions.find(r => r.id === hospital.region_id);
+                        return `
+                            <tr>
+                                <td>${hospital.id}</td>
+                                <td><strong>${escapeHtml(hospital.name)}</strong></td>
+                                <td><code>${escapeHtml(hospital.code)}</code></td>
+                                <td>${region ? escapeHtml(region.name) : 'N/A'}</td>
+                                <td>${escapeHtml(hospital.address || 'N/A')}</td>
+                                <td>${new Date(hospital.created_at).toLocaleDateString()}</td>
+                                <td>
+                                    <button class="btn btn-small btn-primary" onclick="editHospital(${hospital.id})">Edit</button>
+                                </td>
+                            </tr>
+                        `;
+                    }).join('')}
+                </tbody>
+            </table>
+        `;
+        
+        // Populate dropdowns after loading hospitals
+        await populateHospitalDropdowns();
     } catch (error) {
         console.error('Failed to load hospitals:', error);
+    }
+}
+
+// Edit hospital - global function for onclick
+async function editHospital(hospitalId) {
+    try {
+        const hospitals = await apiClient.request('/api/admin/hospitals');
+        const hospital = hospitals.find(h => h.id === hospitalId);
+        
+        if (!hospital) {
+            showError('Hospital not found');
+            return;
+        }
+        
+        document.getElementById('edit-hospital-id').value = hospitalId;
+        document.getElementById('edit-hospital-name').value = hospital.name;
+        document.getElementById('edit-hospital-code').value = hospital.code;
+        document.getElementById('edit-hospital-region').value = hospital.region_id;
+        document.getElementById('edit-hospital-address').value = hospital.address || '';
+        document.getElementById('edit-hospital-form').style.display = 'block';
+    } catch (error) {
+        showError('Failed to load hospital: ' + error.message);
     }
 }
 
@@ -537,6 +665,635 @@ function showError(message) {
     setTimeout(() => {
         errorElement.style.display = 'none';
     }, 5000);
+}
+
+// Show success message
+function showSuccess(message) {
+    // Create success element if it doesn't exist
+    let successElement = document.getElementById('success-message');
+    if (!successElement) {
+        successElement = document.createElement('div');
+        successElement.id = 'success-message';
+        successElement.className = 'success-message';
+        successElement.style.position = 'fixed';
+        successElement.style.top = '20px';
+        successElement.style.right = '20px';
+        successElement.style.zIndex = '9999';
+        successElement.style.maxWidth = '400px';
+        document.body.appendChild(successElement);
+    }
+    
+    successElement.textContent = message;
+    successElement.style.display = 'block';
+    
+    // Hide after 5 seconds
+    setTimeout(() => {
+        successElement.style.display = 'none';
+    }, 5000);
+}
+
+// Load sensor stats
+async function loadSensorStats() {
+    try {
+        const stats = await apiClient.request('/api/admin/sensors/stats');
+        document.getElementById('sensor-stats').innerHTML = `
+            <div class="stat-item">
+                <h4>Total Sensors</h4>
+                <p class="stat-number">${stats.total_sensors || 0}</p>
+            </div>
+            <div class="stat-item">
+                <h4>Active Sensors</h4>
+                <p class="stat-number" style="color: #4CAF50;">${stats.active_sensors || 0}</p>
+            </div>
+            <div class="stat-item">
+                <h4>Inactive Sensors</h4>
+                <p class="stat-number" style="color: #f44336;">${stats.inactive_sensors || 0}</p>
+            </div>
+            <div class="stat-item">
+                <h4>Readings (24h)</h4>
+                <p class="stat-number">${stats.readings_last_24h || 0}</p>
+            </div>
+        `;
+    } catch (error) {
+        console.error('Failed to load sensor stats:', error);
+    }
+}
+
+// Load sensors overview
+async function loadSensorsOverview() {
+    try {
+        const hospitalFilter = document.getElementById('sensor-hospital-filter')?.value || '';
+        const regionFilter = document.getElementById('sensor-region-filter')?.value || '';
+        const searchFilter = document.getElementById('sensor-search')?.value || '';
+        
+        let url = '/api/admin/sensors/overview?';
+        if (hospitalFilter) url += `hospital_id=${hospitalFilter}&`;
+        if (regionFilter) url += `region_id=${regionFilter}&`;
+        if (searchFilter) url += `sensor_id=${searchFilter}&`;
+        
+        const sensors = await apiClient.request(url);
+        const overviewElement = document.getElementById('sensors-overview');
+        
+        if (!sensors || sensors.length === 0) {
+            overviewElement.innerHTML = '<p>No sensors found.</p>';
+            return;
+        }
+        
+        overviewElement.innerHTML = `
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Sensor ID</th>
+                        <th>Hospital</th>
+                        <th>Region</th>
+                        <th>Last Reading</th>
+                        <th>Temp</th>
+                        <th>Humidity</th>
+                        <th>Air Quality</th>
+                        <th>Status</th>
+                        <th>Total Readings</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${sensors.map(sensor => `
+                        <tr class="sensor-row">
+                            <td><strong>${escapeHtml(sensor.sensor_id)}</strong></td>
+                            <td>${escapeHtml(sensor.hospital_name)}</td>
+                            <td>${escapeHtml(sensor.region_name)}</td>
+                            <td>${new Date(sensor.last_reading_timestamp).toLocaleString()}</td>
+                            <td>${sensor.temperature !== null ? sensor.temperature.toFixed(1) + '°C' : 'N/A'}</td>
+                            <td>${sensor.humidity !== null ? sensor.humidity.toFixed(1) + '%' : 'N/A'}</td>
+                            <td>${sensor.air_quality !== null ? sensor.air_quality.toFixed(0) : 'N/A'}</td>
+                            <td>
+                                <span class="status-badge ${sensor.is_active ? 'status-active' : 'status-inactive'}">
+                                    ${sensor.is_active ? 'Active' : 'Inactive'}
+                                </span>
+                            </td>
+                            <td>${sensor.total_readings}</td>
+                            <td>
+                                <button class="btn btn-small btn-primary" onclick="viewSensorDetails('${escapeHtml(sensor.sensor_id)}', ${sensor.hospital_id})">
+                                    View Details
+                                </button>
+                            </td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        `;
+    } catch (error) {
+        console.error('Failed to load sensors overview:', error);
+        document.getElementById('sensors-overview').innerHTML = '<p>Failed to load sensors</p>';
+    }
+}
+
+// View sensor details - global function for onclick
+async function viewSensorDetails(sensorId, hospitalId) {
+    try {
+        const history = await apiClient.request(`/api/admin/sensors/${sensorId}/history?hospital_id=${hospitalId}&limit=50`);
+        
+        const modal = document.getElementById('sensor-modal');
+        const content = document.getElementById('sensor-modal-content');
+        
+        if (history.length === 0) {
+            content.innerHTML = `<p>No history found for sensor ${escapeHtml(sensorId)}</p>`;
+        } else {
+            content.innerHTML = `
+                <h3>Sensor: ${escapeHtml(sensorId)}</h3>
+                <p><strong>Hospital ID:</strong> ${hospitalId}</p>
+                <p><strong>Total Records:</strong> ${history.length}</p>
+                
+                <h4>Recent Readings</h4>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Timestamp</th>
+                            <th>Temperature</th>
+                            <th>Humidity</th>
+                            <th>Air Quality</th>
+                            <th>Custom Data</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${history.map(record => `
+                            <tr>
+                                <td>${new Date(record.timestamp).toLocaleString()}</td>
+                                <td>${record.temperature !== null ? record.temperature.toFixed(1) + '°C' : 'N/A'}</td>
+                                <td>${record.humidity !== null ? record.humidity.toFixed(1) + '%' : 'N/A'}</td>
+                                <td>${record.air_quality !== null ? record.air_quality.toFixed(0) : 'N/A'}</td>
+                                <td><pre style="font-size: 0.8rem; max-width: 200px; overflow-x: auto;">${JSON.stringify(record.data_json, null, 2)}</pre></td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
+        
+        modal.style.display = 'block';
+    } catch (error) {
+        showError('Failed to load sensor details: ' + error.message);
+    }
+}
+
+// Load API keys
+async function loadAPIKeys() {
+    try {
+        const apiKeys = await apiClient.request('/api/admin/api-keys');
+        const listElement = document.getElementById('api-keys-list');
+        
+        if (!apiKeys || apiKeys.length === 0) {
+            listElement.innerHTML = '<p>No API keys found. Generate one to get started.</p>';
+            return;
+        }
+        
+        listElement.innerHTML = `
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Key (truncated)</th>
+                        <th>Hospital ID</th>
+                        <th>Description</th>
+                        <th>Status</th>
+                        <th>Created</th>
+                        <th>Last Used</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${apiKeys.map(key => `
+                        <tr>
+                            <td><code>${escapeHtml(key.key.substring(0, 20))}...</code></td>
+                            <td>${key.hospital_id}</td>
+                            <td>${escapeHtml(key.description || 'N/A')}</td>
+                            <td>
+                                <span class="status-badge ${key.is_active ? 'status-active' : 'status-inactive'}">
+                                    ${key.is_active ? 'Active' : 'Revoked'}
+                                </span>
+                            </td>
+                            <td>${new Date(key.created_at).toLocaleDateString()}</td>
+                            <td>${key.last_used ? new Date(key.last_used).toLocaleString() : 'Never'}</td>
+                            <td>
+                                ${key.is_active ? `<button class="btn btn-small btn-danger" onclick="revokeAPIKey(${key.id})">Revoke</button>` : ''}
+                            </td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        `;
+    } catch (error) {
+        console.error('Failed to load API keys:', error);
+    }
+}
+
+// Revoke API key - global function for onclick
+async function revokeAPIKey(keyId) {
+    if (!confirm('Are you sure you want to revoke this API key? This action cannot be undone.')) {
+        return;
+    }
+    
+    try {
+        await apiClient.request(`/api/admin/api-keys/${keyId}`, { method: 'DELETE' });
+        showSuccess('API key revoked successfully');
+        await loadAPIKeys();
+    } catch (error) {
+        showError('Failed to revoke API key: ' + error.message);
+    }
+}
+
+// Setup admin event listeners
+function setupAdminEventListeners() {
+    // Modal close buttons
+    document.querySelectorAll('.modal-close').forEach(closeBtn => {
+        closeBtn.onclick = function() {
+            this.closest('.modal').style.display = 'none';
+        };
+    });
+    
+    // Close modals when clicking outside
+    window.onclick = function(event) {
+        if (event.target.classList.contains('modal')) {
+            event.target.style.display = 'none';
+        }
+    };
+    
+    // Refresh all button
+    document.getElementById('refresh-all-btn')?.addEventListener('click', async () => {
+        await loadDashboardByRole();
+        showSuccess('Data refreshed');
+    });
+    
+    // Sensor filter button
+    document.getElementById('sensor-filter-btn')?.addEventListener('click', async () => {
+        await loadSensorsOverview();
+    });
+    
+    // Region management buttons
+    document.getElementById('add-region-btn')?.addEventListener('click', () => {
+        document.getElementById('add-region-form').style.display = 'block';
+        document.getElementById('add-region-btn').style.display = 'none';
+    });
+    
+    document.getElementById('cancel-region-btn')?.addEventListener('click', () => {
+        document.getElementById('add-region-form').style.display = 'none';
+        document.getElementById('add-region-btn').style.display = 'block';
+        document.getElementById('region-name').value = '';
+        document.getElementById('region-code').value = '';
+    });
+    
+    document.getElementById('cancel-edit-region-btn')?.addEventListener('click', () => {
+        document.getElementById('edit-region-form').style.display = 'none';
+    });
+    
+    document.getElementById('update-region-btn')?.addEventListener('click', async () => {
+        const regionId = document.getElementById('edit-region-id').value;
+        const name = document.getElementById('edit-region-name').value;
+        const code = document.getElementById('edit-region-code').value;
+        
+        if (!name || !code) {
+            showError('Please fill in all required fields');
+            return;
+        }
+        
+        try {
+            await apiClient.request(`/api/admin/regions/${regionId}`, {
+                method: 'PUT',
+                body: JSON.stringify({ name, code })
+            });
+            
+            showSuccess('Region updated successfully');
+            document.getElementById('edit-region-form').style.display = 'none';
+            await loadRegions();
+        } catch (error) {
+            showError('Failed to update region: ' + error.message);
+        }
+    });
+    
+    document.getElementById('save-region-btn')?.addEventListener('click', async () => {
+        const name = document.getElementById('region-name').value;
+        const code = document.getElementById('region-code').value;
+        
+        if (!name || !code) {
+            showError('Please fill in all required fields');
+            return;
+        }
+        
+        try {
+            await apiClient.request('/api/admin/regions', {
+                method: 'POST',
+                body: JSON.stringify({ name, code })
+            });
+            
+            showSuccess('Region created successfully');
+            document.getElementById('add-region-form').style.display = 'none';
+            document.getElementById('add-region-btn').style.display = 'block';
+            document.getElementById('region-name').value = '';
+            document.getElementById('region-code').value = '';
+            
+            await loadRegions();
+            await populateRegionDropdowns();
+        } catch (error) {
+            showError('Failed to create region: ' + error.message);
+        }
+    });
+    
+    // Hospital management buttons
+    document.getElementById('add-hospital-btn')?.addEventListener('click', () => {
+        document.getElementById('add-hospital-form').style.display = 'block';
+        document.getElementById('add-hospital-btn').style.display = 'none';
+    });
+    
+    document.getElementById('cancel-hospital-btn')?.addEventListener('click', () => {
+        document.getElementById('add-hospital-form').style.display = 'none';
+        document.getElementById('add-hospital-btn').style.display = 'block';
+        clearHospitalForm();
+    });
+    
+    document.getElementById('cancel-edit-hospital-btn')?.addEventListener('click', () => {
+        document.getElementById('edit-hospital-form').style.display = 'none';
+    });
+    
+    document.getElementById('update-hospital-btn')?.addEventListener('click', async () => {
+        const hospitalId = document.getElementById('edit-hospital-id').value;
+        const name = document.getElementById('edit-hospital-name').value;
+        const code = document.getElementById('edit-hospital-code').value;
+        const region_id = parseInt(document.getElementById('edit-hospital-region').value);
+        const address = document.getElementById('edit-hospital-address').value;
+        
+        if (!name || !code || !region_id) {
+            showError('Please fill in all required fields');
+            return;
+        }
+        
+        try {
+            await apiClient.request(`/api/admin/hospitals/${hospitalId}`, {
+                method: 'PUT',
+                body: JSON.stringify({ name, code, region_id, address: address || null })
+            });
+            
+            showSuccess('Hospital updated successfully');
+            document.getElementById('edit-hospital-form').style.display = 'none';
+            await loadHospitals();
+        } catch (error) {
+            showError('Failed to update hospital: ' + error.message);
+        }
+    });
+    
+    document.getElementById('save-hospital-btn')?.addEventListener('click', async () => {
+        const name = document.getElementById('hospital-name').value;
+        const code = document.getElementById('hospital-code').value;
+        const region_id = parseInt(document.getElementById('hospital-region').value);
+        const address = document.getElementById('hospital-address').value;
+        
+        if (!name || !code || !region_id) {
+            showError('Please fill in all required fields');
+            return;
+        }
+        
+        try {
+            await apiClient.request('/api/admin/hospitals', {
+                method: 'POST',
+                body: JSON.stringify({ name, code, region_id, address: address || null })
+            });
+            
+            showSuccess('Hospital created successfully');
+            document.getElementById('add-hospital-form').style.display = 'none';
+            document.getElementById('add-hospital-btn').style.display = 'block';
+            clearHospitalForm();
+            
+            await loadHospitals();
+            await populateHospitalDropdowns();
+        } catch (error) {
+            showError('Failed to create hospital: ' + error.message);
+        }
+    });
+    
+    // API Key management buttons
+    document.getElementById('add-api-key-btn')?.addEventListener('click', () => {
+        document.getElementById('add-api-key-form').style.display = 'block';
+        document.getElementById('add-api-key-btn').style.display = 'none';
+    });
+    
+    document.getElementById('cancel-api-key-btn')?.addEventListener('click', () => {
+        document.getElementById('add-api-key-form').style.display = 'none';
+        document.getElementById('add-api-key-btn').style.display = 'block';
+        document.getElementById('api-key-hospital').value = '';
+        document.getElementById('api-key-description').value = '';
+    });
+    
+    document.getElementById('save-api-key-btn')?.addEventListener('click', async () => {
+        const hospital_id = parseInt(document.getElementById('api-key-hospital').value);
+        const description = document.getElementById('api-key-description').value;
+        
+        if (!hospital_id) {
+            showError('Please select a hospital');
+            return;
+        }
+        
+        try {
+            const result = await apiClient.request('/api/admin/api-keys', {
+                method: 'POST',
+                body: JSON.stringify({ hospital_id, description: description || null })
+            });
+            
+            // Show the generated key in a modal with copy functionality
+            const modal = document.getElementById('sensor-modal');
+            const content = document.getElementById('sensor-modal-content');
+            content.innerHTML = `
+                <h3 style="color: #4CAF50;">✓ API Key Generated Successfully</h3>
+                <div style="background: #fff3cd; border: 1px solid #ffc107; padding: 1rem; border-radius: 4px; margin: 1rem 0;">
+                    <p style="margin: 0; font-weight: bold;">⚠️ IMPORTANT: Save this key securely!</p>
+                    <p style="margin: 0.5rem 0 0 0;">This key will only be shown once and cannot be retrieved later.</p>
+                </div>
+                <div class="form-group">
+                    <label><strong>API Key:</strong></label>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <input type="text" id="generated-api-key" value="${escapeHtml(result.key)}" readonly style="flex: 1; font-family: monospace;">
+                        <button id="copy-api-key-btn" class="btn btn-primary">Copy</button>
+                    </div>
+                </div>
+                <p style="margin-top: 1rem;">Use this key in the <code>X-API-Key</code> header when sending sensor data.</p>
+                <p>Example: <code>X-API-Key: ${escapeHtml(result.key)}</code></p>
+            `;
+            modal.style.display = 'block';
+            
+            // Add copy functionality
+            document.getElementById('copy-api-key-btn').addEventListener('click', () => {
+                const keyInput = document.getElementById('generated-api-key');
+                keyInput.select();
+                document.execCommand('copy');
+                showSuccess('API key copied to clipboard!');
+            });
+            
+            showSuccess('API key generated successfully');
+            document.getElementById('add-api-key-form').style.display = 'none';
+            document.getElementById('add-api-key-btn').style.display = 'block';
+            document.getElementById('api-key-hospital').value = '';
+            document.getElementById('api-key-description').value = '';
+            
+            await loadAPIKeys();
+        } catch (error) {
+            showError('Failed to generate API key: ' + error.message);
+        }
+    });
+}
+
+// Helper to clear hospital form
+function clearHospitalForm() {
+    document.getElementById('hospital-name').value = '';
+    document.getElementById('hospital-code').value = '';
+    document.getElementById('hospital-region').value = '';
+    document.getElementById('hospital-address').value = '';
+}
+
+// Populate region dropdowns
+async function populateRegionDropdowns() {
+    try {
+        const regions = await apiClient.request('/api/admin/regions');
+        
+        // Populate hospital form region dropdown
+        const hospitalRegionSelect = document.getElementById('hospital-region');
+        if (hospitalRegionSelect) {
+            hospitalRegionSelect.innerHTML = '<option value="">Select a region...</option>' +
+                regions.map(r => `<option value="${r.id}">${escapeHtml(r.name)}</option>`).join('');
+        }
+        
+        // Populate edit hospital form region dropdown
+        const editHospitalRegionSelect = document.getElementById('edit-hospital-region');
+        if (editHospitalRegionSelect) {
+            editHospitalRegionSelect.innerHTML = '<option value="">Select a region...</option>' +
+                regions.map(r => `<option value="${r.id}">${escapeHtml(r.name)}</option>`).join('');
+        }
+        
+        // Populate sensor filter region dropdown
+        const sensorRegionFilter = document.getElementById('sensor-region-filter');
+        if (sensorRegionFilter) {
+            sensorRegionFilter.innerHTML = '<option value="">All Regions</option>' +
+                regions.map(r => `<option value="${r.id}">${escapeHtml(r.name)}</option>`).join('');
+        }
+    } catch (error) {
+        console.error('Failed to populate region dropdowns:', error);
+    }
+}
+
+// Populate hospital dropdowns
+async function populateHospitalDropdowns() {
+    try {
+        const hospitals = await apiClient.request('/api/admin/hospitals');
+        
+        // Populate API key hospital dropdown
+        const apiKeyHospitalSelect = document.getElementById('api-key-hospital');
+        if (apiKeyHospitalSelect) {
+            apiKeyHospitalSelect.innerHTML = '<option value="">Select a hospital...</option>' +
+                hospitals.map(h => `<option value="${h.id}">${escapeHtml(h.name)}</option>`).join('');
+        }
+        
+        // Populate sensor filter hospital dropdown
+        const sensorHospitalFilter = document.getElementById('sensor-hospital-filter');
+        if (sensorHospitalFilter) {
+            sensorHospitalFilter.innerHTML = '<option value="">All Hospitals</option>' +
+                hospitals.map(h => `<option value="${h.id}">${escapeHtml(h.name)}</option>`).join('');
+        }
+    } catch (error) {
+        console.error('Failed to populate hospital dropdowns:', error);
+    }
+}
+
+// Show error message
+function showError(message) {
+    const errorElement = document.getElementById('error-message');
+    errorElement.textContent = message;
+    errorElement.style.display = 'block';
+    
+    // Hide after 5 seconds
+    setTimeout(() => {
+        errorElement.style.display = 'none';
+    }, 5000);
+}
+
+// Edit user role - global function for onclick
+async function editUserRole(userId) {
+    try {
+        // Get user details
+        const users = await apiClient.request('/api/admin/users');
+        const user = users.find(u => u.id === userId);
+        
+        if (!user) {
+            showError('User not found');
+            return;
+        }
+
+        // Get regions and hospitals for dropdowns
+        const regions = await apiClient.request('/api/admin/regions');
+        const hospitals = await apiClient.request('/api/admin/hospitals');
+
+        // Show modal with edit form
+        const modal = document.getElementById('user-role-modal');
+        const content = document.getElementById('user-role-modal-content');
+        
+        content.innerHTML = `
+            <div class="form-group">
+                <label><strong>User:</strong> ${escapeHtml(user.username)} (${escapeHtml(user.email)})</label>
+            </div>
+            <div class="form-group">
+                <label for="edit-user-role">Role *</label>
+                <select id="edit-user-role" required>
+                    <option value="1" ${user.role === 1 ? 'selected' : ''}>Pending</option>
+                    <option value="2" ${user.role === 2 ? 'selected' : ''}>Admin</option>
+                    <option value="3" ${user.role === 3 ? 'selected' : ''}>Region Admin</option>
+                    <option value="4" ${user.role === 4 ? 'selected' : ''}>Hospital User</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="edit-user-region">Region</label>
+                <select id="edit-user-region">
+                    <option value="">None</option>
+                    ${regions.map(r => `<option value="${r.id}" ${user.region_id === r.id ? 'selected' : ''}>${escapeHtml(r.name)}</option>`).join('')}
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="edit-user-hospital">Hospital</label>
+                <select id="edit-user-hospital">
+                    <option value="">None</option>
+                    ${hospitals.map(h => `<option value="${h.id}" ${user.hospital_id === h.id ? 'selected' : ''}>${escapeHtml(h.name)}</option>`).join('')}
+                </select>
+            </div>
+            <button id="save-user-role-btn" class="btn btn-success">Save Changes</button>
+        `;
+
+        modal.style.display = 'block';
+
+        // Save button handler
+        document.getElementById('save-user-role-btn').addEventListener('click', async () => {
+            const newRole = parseInt(document.getElementById('edit-user-role').value);
+            const newRegionId = document.getElementById('edit-user-region').value;
+            const newHospitalId = document.getElementById('edit-user-hospital').value;
+
+            try {
+                // Update role
+                await apiClient.request(`/api/admin/users/${userId}/role`, {
+                    method: 'POST',
+                    body: JSON.stringify({ role: newRole })
+                });
+
+                // Update assignment
+                await apiClient.request(`/api/admin/users/${userId}/assign`, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        region_id: newRegionId ? parseInt(newRegionId) : null,
+                        hospital_id: newHospitalId ? parseInt(newHospitalId) : null
+                    })
+                });
+
+                showSuccess('User updated successfully');
+                modal.style.display = 'none';
+                await loadAdminUsers();
+            } catch (error) {
+                showError('Failed to update user: ' + error.message);
+            }
+        });
+    } catch (error) {
+        showError('Failed to load user data: ' + error.message);
+    }
 }
 
 // Escape HTML to prevent XSS
