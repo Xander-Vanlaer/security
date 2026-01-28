@@ -10,7 +10,7 @@ from slowapi.errors import RateLimitExceeded
 import logging
 from app.config import get_settings
 from app.database import engine, Base
-from app.routers import auth, data
+from app.routers import auth, data, admin, region, sensors, dashboard
 
 # Configure logging
 logging.basicConfig(
@@ -67,6 +67,10 @@ async def add_security_headers(request: Request, call_next):
 # Include routers
 app.include_router(auth.router)
 app.include_router(data.router)
+app.include_router(admin.router)
+app.include_router(region.router)
+app.include_router(sensors.router)
+app.include_router(dashboard.router)
 
 
 @app.get("/health")
