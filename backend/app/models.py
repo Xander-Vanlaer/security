@@ -108,6 +108,16 @@ class AllowedEmail(Base):
     created_by = Column(Integer, ForeignKey("users.id"), nullable=True)
 
 
+class AllowedDomain(Base):
+    """Domain whitelist for registration"""
+    __tablename__ = "allowed_domains"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    domain = Column(String(100), unique=True, nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+
+
 class DataItem(Base):
     """Example data model to demonstrate API functionality"""
     __tablename__ = "data_items"

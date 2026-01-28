@@ -7,14 +7,14 @@ from sqlalchemy import func
 from typing import List, Optional
 from datetime import datetime, timedelta
 from app.database import get_db
-from app.models import User, Region, Hospital, APIKey, SensorData, AllowedEmail
+from app.models import User, Region, Hospital, APIKey, SensorData, AllowedEmail, AllowedDomain
 from app.schemas import (
     UserResponse, UserRoleUpdate, UserAssignment,
     RegionCreate, RegionResponse, RegionUpdate,
     HospitalCreate, HospitalResponse, HospitalUpdate,
     APIKeyCreate, APIKeyResponse, MessageResponse,
     SensorOverviewResponse, SensorStatsResponse, SensorDataResponse,
-    AllowedEmailCreate, AllowedEmailResponse
+    AllowedEmailCreate, AllowedEmailResponse, AllowedDomainCreate, AllowedDomainResponse
 )
 from app.dependencies import require_admin
 import secrets
@@ -634,3 +634,65 @@ async def delete_allowed_email(
     db.commit()
     
     return MessageResponse(message="Email removed from whitelist successfully")
+
+
+# Domain Whitelist Management Endpoints
+
+@router.post("/allowed-domains", response_model=AllowedDomainResponse, status_code=status.HTTP_201_CREATED)
+async def add_allowed_domain(
+    domain_data: AllowedDomainCreate,
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """Add domain to whitelist (admin only)"""
+    # Normalize domain to lowercase
+    domain = domain_data.domain.lower()
+    
+    # Check if domain already exists
+    existing = db.query(AllowedDomain).filter(AllowedDomain.domain == domain).first()
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Domain already in whitelist"
+        )
+    
+    allowed_domain = AllowedDomain(
+        domain=domain,
+        created_by=current_user.id
+    )
+    db.add(allowed_domain)
+    db.commit()
+    db.refresh(allowed_domain)
+    
+    return allowed_domain
+
+
+@router.get("/allowed-domains", response_model=List[AllowedDomainResponse])
+async def list_allowed_domains(
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """List all whitelisted domains (admin only)"""
+    domains = db.query(AllowedDomain).all()
+    return domains
+
+
+@router.delete("/allowed-domains/{domain_id}", response_model=MessageResponse)
+async def delete_allowed_domain(
+    domain_id: int,
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """Remove domain from whitelist (admin only)"""
+    allowed_domain = db.query(AllowedDomain).filter(AllowedDomain.id == domain_id).first()
+    
+    if not allowed_domain:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Domain not found in whitelist"
+        )
+    
+    db.delete(allowed_domain)
+    db.commit()
+    
+    return MessageResponse(message="Domain removed from whitelist successfully")

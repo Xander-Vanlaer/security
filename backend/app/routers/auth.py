@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 from app.database import get_db
-from app.models import User, AllowedEmail
+from app.models import User, AllowedEmail, AllowedDomain
 from app.schemas import (
     UserCreate, UserLogin, UserResponse, TokenResponse, 
     Token2FAResponse, User2FAVerify, Enable2FAResponse, MessageResponse,
@@ -32,12 +32,15 @@ async def register(
     db: Session = Depends(get_db)
 ):
     """Register a new user"""
-    # Check if email is in whitelist
-    allowed_email = db.query(AllowedEmail).filter(AllowedEmail.email == user_data.email).first()
-    if not allowed_email:
+    # Extract domain from email
+    email_domain = '@' + user_data.email.split('@')[1].lower()
+    
+    # Check if domain is in whitelist
+    allowed_domain = db.query(AllowedDomain).filter(AllowedDomain.domain == email_domain).first()
+    if not allowed_domain:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Email not authorized for registration. Please contact an administrator."
+            detail=f"Domain '{email_domain}' is not authorized for registration. Please contact an administrator."
         )
     
     # Check if username already exists

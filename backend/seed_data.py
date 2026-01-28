@@ -10,7 +10,7 @@ import secrets
 sys.path.insert(0, os.path.dirname(__file__))
 
 from app.database import SessionLocal
-from app.models import User, Region, Hospital, APIKey, SensorData
+from app.models import User, Region, Hospital, APIKey, SensorData, AllowedDomain
 from app.auth import get_password_hash
 
 
@@ -172,6 +172,29 @@ def seed_data():
                 sensor_count += 1
         db.commit()
         print(f"✓ Created {sensor_count} sensor data readings")
+        
+        # Create default allowed domains
+        print("\nCreating default allowed domains...")
+        default_domains = [
+            "@gmail.com",
+            "@outlook.com",
+            "@hotmail.com",
+            "@yahoo.com",
+            "@example.com"
+        ]
+        
+        domains_created = 0
+        for domain in default_domains:
+            existing = db.query(AllowedDomain).filter(AllowedDomain.domain == domain).first()
+            if not existing:
+                allowed_domain = AllowedDomain(
+                    domain=domain,
+                    created_by=None  # System-created
+                )
+                db.add(allowed_domain)
+                domains_created += 1
+        db.commit()
+        print(f"✓ Created {domains_created} default allowed domains")
         
         print("\n" + "="*60)
         print("Database seeding completed successfully!")
