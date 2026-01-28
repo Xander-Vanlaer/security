@@ -32,8 +32,17 @@ async def register(
     db: Session = Depends(get_db)
 ):
     """Register a new user"""
-    # Check if email is in whitelist
+    # Check if email is in whitelist (full email or domain)
     allowed_email = db.query(AllowedEmail).filter(AllowedEmail.email == user_data.email).first()
+    
+    # If not found by full email, check by domain
+    if not allowed_email and '@' in user_data.email:
+        email_parts = user_data.email.split('@')
+        # Ensure valid email format (exactly one @ and content after it)
+        if len(email_parts) == 2 and email_parts[1]:
+            domain = '@' + email_parts[1]
+            allowed_email = db.query(AllowedEmail).filter(AllowedEmail.email == domain).first()
+    
     if not allowed_email:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

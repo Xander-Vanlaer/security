@@ -5,6 +5,8 @@ import sys
 import os
 from datetime import datetime, timedelta
 import secrets
+import random
+import math
 
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(__file__))
@@ -150,28 +152,63 @@ def seed_data():
         # Create sample sensor data
         print("\nCreating sample sensor data...")
         sensor_count = 0
-        for hospital in hospitals[:3]:  # First 3 hospitals
-            for i in range(10):  # 10 readings per hospital
-                timestamp = datetime.utcnow() - timedelta(hours=i)
-                sensor_data = SensorData(
-                    hospital_id=hospital.id,
-                    sensor_id=f"OPI-{hospital.code}-001",
-                    timestamp=timestamp,
-                    temperature=20.0 + (i % 5),
-                    humidity=45.0 + (i % 10),
-                    air_quality=80.0 + (i % 15),
-                    data_json={
-                        "temperature": 20.0 + (i % 5),
-                        "humidity": 45.0 + (i % 10),
-                        "air_quality": 80.0 + (i % 15),
-                        "co2": 400 + (i * 10),
-                        "pressure": 1013 - i
-                    }
-                )
-                db.add(sensor_data)
-                sensor_count += 1
+        
+        # Generate realistic sensor data for the last 7 days
+        for hospital in hospitals:
+            # Create 2-3 sensors per hospital
+            num_sensors = random.randint(2, 3)
+            for sensor_num in range(1, num_sensors + 1):
+                sensor_id = f"OPI-{hospital.code}-{sensor_num:03d}"
+                
+                # Generate 20-30 readings per sensor over the last 7 days
+                num_readings = random.randint(20, 30)
+                for i in range(num_readings):
+                    # Spread readings over last 7 days
+                    hours_ago = random.uniform(0, 168)  # 7 days = 168 hours
+                    timestamp = datetime.utcnow() - timedelta(hours=hours_ago)
+                    
+                    # Generate realistic temperature (15-30°C) with daily cycle
+                    base_temp = 22.0
+                    daily_variation = 4.0 * math.sin((hours_ago / 24.0) * 2 * math.pi)
+                    random_variation = random.uniform(-2.0, 2.0)
+                    temperature = base_temp + daily_variation + random_variation
+                    
+                    # Generate realistic humidity (30-70%)
+                    base_humidity = 50.0
+                    humidity_variation = random.uniform(-20.0, 20.0)
+                    humidity = max(30.0, min(70.0, base_humidity + humidity_variation))
+                    
+                    # Generate realistic air quality (50-100)
+                    base_air_quality = 75.0
+                    air_quality_variation = random.uniform(-25.0, 25.0)
+                    air_quality = max(50.0, min(100.0, base_air_quality + air_quality_variation))
+                    
+                    # Additional sensor data
+                    co2 = random.randint(400, 800)
+                    pressure = random.uniform(1010, 1020)
+                    
+                    sensor_data = SensorData(
+                        hospital_id=hospital.id,
+                        sensor_id=sensor_id,
+                        timestamp=timestamp,
+                        temperature=round(temperature, 2),
+                        humidity=round(humidity, 2),
+                        air_quality=round(air_quality, 2),
+                        data_json={
+                            "temperature": round(temperature, 2),
+                            "humidity": round(humidity, 2),
+                            "air_quality": round(air_quality, 2),
+                            "co2": co2,
+                            "pressure": round(pressure, 2),
+                            "sensor_type": "environmental",
+                            "firmware_version": "1.2.3"
+                        }
+                    )
+                    db.add(sensor_data)
+                    sensor_count += 1
+        
         db.commit()
-        print(f"✓ Created {sensor_count} sensor data readings")
+        print(f"✓ Created {sensor_count} sensor data readings across multiple sensors over the last 7 days")
         
         print("\n" + "="*60)
         print("Database seeding completed successfully!")
