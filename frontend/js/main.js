@@ -125,7 +125,7 @@ async function showAdminDashboard() {
         await loadRegions();
         await loadHospitals();
         await loadAPIKeys();
-        await loadAllowedEmails();
+        await loadAllowedDomains();
         setupAdminEventListeners();
     }
 }
@@ -968,13 +968,13 @@ async function revokeAPIKey(keyId) {
 }
 
 // Load allowed emails
-async function loadAllowedEmails() {
+async function loadAllowedDomains() {
     try {
-        const emails = await apiClient.request('/api/admin/allowed-emails');
-        const listElement = document.getElementById('allowed-emails-list');
+        const domains = await apiClient.request('/api/admin/allowed-domains');
+        const listElement = document.getElementById('allowed-domains-list');
         
-        if (!emails || emails.length === 0) {
-            listElement.innerHTML = '<p>No whitelisted emails found. Add one to allow registrations.</p>';
+        if (!domains || domains.length === 0) {
+            listElement.innerHTML = '<p>No whitelisted domains found. Add one to allow registrations.</p>';
             return;
         }
         
@@ -982,18 +982,18 @@ async function loadAllowedEmails() {
             <table class="data-table">
                 <thead>
                     <tr>
-                        <th>Email</th>
+                        <th>Domain</th>
                         <th>Added</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
-                    ${emails.map(email => `
+                    ${domains.map(domain => `
                         <tr>
-                            <td><strong>${escapeHtml(email.email)}</strong></td>
-                            <td>${new Date(email.created_at).toLocaleDateString()}</td>
+                            <td><strong>${escapeHtml(domain.domain)}</strong></td>
+                            <td>${new Date(domain.created_at).toLocaleDateString()}</td>
                             <td>
-                                <button class="btn btn-small btn-danger" onclick="deleteAllowedEmail(${email.id})">Remove</button>
+                                <button class="btn btn-small btn-danger" onclick="deleteAllowedDomain(${domain.id})">Remove</button>
                             </td>
                         </tr>
                     `).join('')}
@@ -1001,22 +1001,22 @@ async function loadAllowedEmails() {
             </table>
         `;
     } catch (error) {
-        console.error('Failed to load allowed emails:', error);
+        console.error('Failed to load allowed domains:', error);
     }
 }
 
-// Delete allowed email - global function for onclick
-async function deleteAllowedEmail(emailId) {
-    if (!confirm('Are you sure you want to remove this email from the whitelist?')) {
+// Delete allowed domain - global function for onclick
+async function deleteAllowedDomain(domainId) {
+    if (!confirm('Are you sure you want to remove this domain from the whitelist?')) {
         return;
     }
     
     try {
-        await apiClient.request(`/api/admin/allowed-emails/${emailId}`, { method: 'DELETE' });
-        showSuccess('Email removed from whitelist successfully');
-        await loadAllowedEmails();
+        await apiClient.request(`/api/admin/allowed-domains/${domainId}`, { method: 'DELETE' });
+        showSuccess('Domain removed from whitelist successfully');
+        await loadAllowedDomains();
     } catch (error) {
-        showError('Failed to remove email: ' + error.message);
+        showError('Failed to remove domain: ' + error.message);
     }
 }
 
@@ -1269,40 +1269,46 @@ function setupAdminEventListeners() {
         }
     });
     
-    // Email whitelist management buttons
-    document.getElementById('add-email-btn')?.addEventListener('click', () => {
-        document.getElementById('add-email-form').style.display = 'block';
-        document.getElementById('add-email-btn').style.display = 'none';
+    // Domain whitelist management buttons
+    document.getElementById('add-domain-btn')?.addEventListener('click', () => {
+        document.getElementById('add-domain-form').style.display = 'block';
+        document.getElementById('add-domain-btn').style.display = 'none';
     });
     
-    document.getElementById('cancel-email-btn')?.addEventListener('click', () => {
-        document.getElementById('add-email-form').style.display = 'none';
-        document.getElementById('add-email-btn').style.display = 'block';
-        document.getElementById('whitelist-email').value = '';
+    document.getElementById('cancel-domain-btn')?.addEventListener('click', () => {
+        document.getElementById('add-domain-form').style.display = 'none';
+        document.getElementById('add-domain-btn').style.display = 'block';
+        document.getElementById('whitelist-domain').value = '';
     });
     
-    document.getElementById('save-email-btn')?.addEventListener('click', async () => {
-        const email = document.getElementById('whitelist-email').value.trim();
+    document.getElementById('save-domain-btn')?.addEventListener('click', async () => {
+        const domain = document.getElementById('whitelist-domain').value.trim();
         
-        if (!email) {
-            showError('Please enter an email address');
+        if (!domain) {
+            showError('Please enter a domain');
+            return;
+        }
+        
+        // Validate domain format
+        if (!domain.match(/^@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/)) {
+            showError('Invalid domain format. Must start with @ (e.g., @gmail.com)');
             return;
         }
         
         try {
-            await apiClient.request('/api/admin/allowed-emails', {
+            await apiClient.request('/api/admin/allowed-domains', {
                 method: 'POST',
-                body: JSON.stringify({ email })
+                body: JSON.stringify({ domain })
             });
             
-            showSuccess('Email added to whitelist successfully');
-            document.getElementById('add-email-form').style.display = 'none';
-            document.getElementById('add-email-btn').style.display = 'block';
-            document.getElementById('whitelist-email').value = '';
+            showSuccess('Domain added to whitelist successfully');
+            document.getElementById('add-domain-form').style.display = 'none';
+            document.getElementById('add-domain-btn').style.display = 'block';
+            document.getElementById('whitelist-domain').value = '';
             
-            await loadAllowedEmails();
+            await loadAllowedDomains();
         } catch (error) {
-            showError('Failed to add email to whitelist: ' + error.message);
+            showError('Failed to add domain to whitelist: ' + error.message);
         }
     });
 }
