@@ -113,6 +113,26 @@ This document outlines the comprehensive security measures implemented in the Se
   - alembic updated to 1.13.1
   - uvicorn updated to 0.27.1
 
+### 18. Sensor API Security
+- ✅ **Sensor-Based API Keys**: Each sensor has a unique API key and identifier
+- ✅ **Sensor ID Validation**: Requests validated against registered sensor ID
+- ✅ **Admin Validation Required**: API keys must be validated by admin before use
+- ✅ **API Key Truncation**: Keys truncated in listings (show only first 12 characters)
+- ✅ **Custom Data Size Limit**: Maximum 1MB for custom_data field
+- ✅ **Rate Limiting**: 100 requests per minute per API key
+
+### 19. Email Whitelist System
+- ✅ **Registration Restriction**: Only whitelisted emails can register
+- ✅ **Admin-Only Management**: Only admins can add/remove whitelisted emails
+- ✅ **Clear Error Messages**: Users informed if email not authorized
+- ✅ **Audit Trail**: Track who added each email to whitelist
+
+### 20. Data Minimization
+- ✅ **API Key Truncation**: Full keys only shown once at creation
+- ✅ **Limited Logging**: Only essential data logged (sensor_id, timestamp, status)
+- ✅ **No Excessive Data Exposure**: Sensitive data not exposed in API responses
+- ✅ **Size Validation**: Custom data limited to prevent abuse
+
 ## 🔍 Security Testing Performed
 
 ### CodeQL Analysis
@@ -190,6 +210,16 @@ This document outlines the comprehensive security measures implemented in the Se
 - Implement breach notification process
 - Regular security drills
 
+### 11. Sensor API Security Best Practices
+- **Unique Sensor IDs**: Use clear naming conventions (e.g., HOSPITAL_CODE-SENSOR_TYPE-NUMBER)
+- **API Key Rotation**: Regularly rotate API keys for sensors
+- **Validation Workflow**: Always validate API keys after creation
+- **Monitor Usage**: Track API key last_used timestamps to detect anomalies
+- **Revoke Unused Keys**: Revoke API keys for decommissioned sensors
+- **Secure Key Storage**: Store API keys securely on sensor devices (use environment variables, not hardcoded)
+- **HTTPS Only**: Always use HTTPS for sensor data transmission in production
+- **Size Limits**: Monitor custom_data usage to prevent abuse
+
 ## 📋 Security Checklist
 
 - [x] Passwords hashed with bcrypt
@@ -210,6 +240,12 @@ This document outlines the comprehensive security measures implemented in the Se
 - [x] No known vulnerabilities
 - [x] CodeQL scan clean
 - [x] Code review completed
+- [x] Sensor-based API key system
+- [x] API key validation by admin
+- [x] Email whitelist for registration
+- [x] Data minimization practices
+- [x] API key truncation in listings
+- [x] Custom data size limits
 
 ## 🔐 Vulnerability Disclosure
 

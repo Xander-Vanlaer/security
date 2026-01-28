@@ -150,17 +150,56 @@ After successful setup:
 
 ## 📖 Usage Guide
 
+### Email Whitelist System
+
+For enhanced security, the system now requires email addresses to be whitelisted before users can register.
+
+**Adding Emails to Whitelist (Admin Only):**
+
+1. Login as **Admin**
+2. Navigate to admin dashboard
+3. Go to **Email Whitelist Management** section
+4. Click **"Add Email to Whitelist"**
+5. Enter the email address
+6. Click **"Add Email"**
+
+**Via API:**
+
+```bash
+# Add email to whitelist (replace {access_token})
+curl -X POST http://localhost:8000/api/admin/allowed-emails \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer {access_token}" \
+  -d '{"email": "newuser@example.com"}'
+
+# List whitelisted emails
+curl -X GET http://localhost:8000/api/admin/allowed-emails \
+  -H "Authorization: Bearer {access_token}"
+
+# Remove email from whitelist (replace {email_id})
+curl -X DELETE http://localhost:8000/api/admin/allowed-emails/{email_id} \
+  -H "Authorization: Bearer {access_token}"
+```
+
+**Important:**
+- Only whitelisted emails can register new accounts
+- Users attempting to register with non-whitelisted emails will receive an error
+- Contact an administrator to add your email to the whitelist
+
 ### Creating an Account
+
+**Prerequisites:** Your email must be whitelisted by an administrator.
 
 1. Navigate to http://localhost:3000
 2. Click **"Register"**
 3. Fill in:
    - Username (min 3 characters)
-   - Email address
+   - **Email address** (must be whitelisted)
    - Password (min 8 characters, must include uppercase, lowercase, and numbers)
 4. Click **"Register"**
-5. You'll see a message about pending approval
-6. **New users start as "Pending" (role 1)** - Contact admin to get role assigned
+5. If your email is not whitelisted, you'll receive an error - contact an administrator
+6. You'll see a message about pending approval
+7. **New users start as "Pending" (role 1)** - Contact admin to get role assigned
 
 ### Sample User Accounts (after running seed_data.py)
 
@@ -224,9 +263,13 @@ After successful setup:
 | POST | `/api/admin/regions` | Create new region |
 | GET | `/api/admin/hospitals` | List all hospitals |
 | POST | `/api/admin/hospitals` | Create new hospital |
-| POST | `/api/admin/api-keys` | Generate API key for hospital |
+| POST | `/api/admin/api-keys` | Generate API key for sensor |
+| PUT | `/api/admin/api-keys/{key_id}/validate` | Validate/approve API key |
 | DELETE | `/api/admin/api-keys/{key_id}` | Revoke API key |
 | GET | `/api/admin/api-keys` | List all API keys |
+| POST | `/api/admin/allowed-emails` | Add email to whitelist |
+| GET | `/api/admin/allowed-emails` | List whitelisted emails |
+| DELETE | `/api/admin/allowed-emails/{email_id}` | Remove email from whitelist |
 
 ### Region Admin Endpoints (Region Admin or Admin roles)
 
@@ -271,13 +314,25 @@ After successful setup:
 
 ## 🌡️ IoT Sensor Integration (Orange Pi)
 
+### Sensor-Based API Key System
+
+The system now uses **sensor-based API keys** instead of hospital-based keys. Each sensor has its own unique identifier and dedicated API key.
+
+**Benefits:**
+- Better tracking of individual sensors
+- Enhanced security through sensor-ID validation
+- Admin validation required before sensors can submit data
+- Prevents API key sharing between sensors
+
 ### Generating API Keys
 
 1. Login as **Admin**
 2. Navigate to admin dashboard
 3. Create a hospital (if not exists)
-4. Generate API key for the hospital
-5. Save the API key securely (shown only once)
+4. Generate API key with a unique **Sensor ID**
+   - Example Sensor ID: `HOSP001-TEMP-001` (Hospital Code - Sensor Type - Number)
+5. **Validate** the API key to enable it
+6. Save the API key securely (shown only once)
 
 Alternatively, using the API:
 
@@ -287,14 +342,20 @@ curl -X POST http://localhost:8000/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"username": "admin", "password": "Admin123!"}'
 
-# Create API key (replace {hospital_id} and {access_token})
+# Create API key (replace {sensor_id}, {hospital_id} and {access_token})
 curl -X POST http://localhost:8000/api/admin/api-keys \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer {access_token}" \
-  -d '{"hospital_id": 1, "description": "Orange Pi Sensor 001"}'
+  -d '{"sensor_id": "HOSP001-TEMP-001", "hospital_id": 1, "description": "Temperature sensor in Ward A"}'
+
+# Validate the API key (replace {key_id} and {access_token})
+curl -X PUT http://localhost:8000/api/admin/api-keys/{key_id}/validate \
+  -H "Authorization: Bearer {access_token}"
 ```
 
 ### Sending Sensor Data from Orange Pi
+
+**Important:** The `sensor_id` in your data must exactly match the sensor ID registered with the API key.
 
 **Python Example:**
 
@@ -305,15 +366,16 @@ from datetime import datetime
 
 API_URL = "http://your-server:8000/api/sensors/data"
 API_KEY = "sk_your_generated_api_key_here"
+SENSOR_ID = "HOSP001-TEMP-001"  # Must match the sensor_id registered with the API key
 
 # Sample sensor reading
 sensor_data = {
-    "sensor_id": "OPI-001",
-    "timestamp": datetime.utcnow().isoformat() + "Z",
+    "sensor_id": SENSOR_ID,  # Required: Must match API key's sensor_id
+    "timestamp": datetime.utcnow().isoformat() + "Z",  # Optional
     "temperature": 22.5,
     "humidity": 45.2,
     "air_quality": 85,
-    "custom_data": {
+    "custom_data": {  # Optional, max 1MB
         "co2": 400,
         "pressure": 1013,
         "location": "Ward A"
@@ -330,6 +392,14 @@ response = requests.post(API_URL, json=sensor_data, headers=headers)
 if response.status_code == 201:
     print("Sensor data uploaded successfully!")
     print(response.json())
+elif response.status_code == 403:
+    if "pending admin validation" in response.text.lower():
+        print("Error: API key not yet validated by admin")
+    elif "sensor id mismatch" in response.text.lower():
+        print(f"Error: Sensor ID mismatch. Check that sensor_id matches: {SENSOR_ID}")
+    else:
+        print(f"Error: {response.status_code}")
+        print(response.text)
 else:
     print(f"Error: {response.status_code}")
     print(response.text)
@@ -342,7 +412,7 @@ curl -X POST http://localhost:8000/api/sensors/data \
   -H "X-API-Key: sk_your_generated_api_key_here" \
   -H "Content-Type: application/json" \
   -d '{
-    "sensor_id": "OPI-001",
+    "sensor_id": "HOSP001-TEMP-001",
     "timestamp": "2026-01-28T10:30:00Z",
     "temperature": 22.5,
     "humidity": 45.2,
@@ -358,14 +428,18 @@ curl -X POST http://localhost:8000/api/sensors/data \
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `sensor_id` | string | Yes | Unique identifier for the sensor |
+| `sensor_id` | string | Yes | Unique identifier for the sensor (must match API key's sensor_id) |
 | `timestamp` | datetime | No | Timestamp of reading (UTC, defaults to now) |
 | `temperature` | float | No | Temperature in Celsius |
 | `humidity` | float | No | Humidity percentage |
 | `air_quality` | float | No | Air quality index |
-| `custom_data` | object | No | Additional sensor data as JSON |
+| `custom_data` | object | No | Additional sensor data as JSON (max 1MB) |
 
-**Note:** All sensor data is stored in `data_json` field. Standard fields (temperature, humidity, air_quality) are also available as separate columns for easier querying.
+**Note:** 
+- The `sensor_id` must exactly match the sensor ID registered with your API key
+- All sensor data is stored in `data_json` field
+- Standard fields (temperature, humidity, air_quality) are also available as separate columns for easier querying
+- API keys require admin validation before they can be used
 
 ### Rate Limiting
 
