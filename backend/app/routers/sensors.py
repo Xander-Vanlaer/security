@@ -25,6 +25,13 @@ async def ingest_sensor_data(
     db: Session = Depends(get_db)
 ):
     """Ingest sensor data from Orange Pi or other IoT devices"""
+    # Validate sensor_id matches the API key's sensor_id
+    if sensor_data.sensor_id != api_key.sensor_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Sensor ID mismatch. This API key is registered for sensor '{api_key.sensor_id}'"
+        )
+    
     # Build data_json from all provided fields
     data_json = {}
     
@@ -35,6 +42,14 @@ async def ingest_sensor_data(
     if sensor_data.air_quality is not None:
         data_json["air_quality"] = sensor_data.air_quality
     if sensor_data.custom_data:
+        # Validate custom_data size (max 1MB when serialized)
+        import json
+        custom_data_size = len(json.dumps(sensor_data.custom_data))
+        if custom_data_size > 1048576:  # 1MB
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail="custom_data exceeds maximum size of 1MB"
+            )
         data_json.update(sensor_data.custom_data)
     
     # Create sensor data record
@@ -49,6 +64,10 @@ async def ingest_sensor_data(
     )
     
     db.add(db_sensor_data)
+    
+    # Update API key last_used timestamp
+    api_key.last_used = datetime.utcnow()
+    
     db.commit()
     db.refresh(db_sensor_data)
     
