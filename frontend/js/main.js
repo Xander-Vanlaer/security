@@ -979,10 +979,13 @@ async function loadAllowedEmails() {
         }
         
         listElement.innerHTML = `
+            <p style="margin-bottom: 1rem; color: #666;">
+                <strong>Note:</strong> You can whitelist specific emails (e.g., user@example.com) or entire domains (e.g., @example.com)
+            </p>
             <table class="data-table">
                 <thead>
                     <tr>
-                        <th>Email</th>
+                        <th>Email/Domain</th>
                         <th>Added</th>
                         <th>Actions</th>
                     </tr>
@@ -990,7 +993,7 @@ async function loadAllowedEmails() {
                 <tbody>
                     ${emails.map(email => `
                         <tr>
-                            <td><strong>${escapeHtml(email.email)}</strong></td>
+                            <td><strong>${escapeHtml(email.email)}</strong>${email.email.startsWith('@') ? ' <span style="color: #4CAF50;">(Domain)</span>' : ''}</td>
                             <td>${new Date(email.created_at).toLocaleDateString()}</td>
                             <td>
                                 <button class="btn btn-small btn-danger" onclick="deleteAllowedEmail(${email.id})">Remove</button>
@@ -1285,7 +1288,13 @@ function setupAdminEventListeners() {
         const email = document.getElementById('whitelist-email').value.trim();
         
         if (!email) {
-            showError('Please enter an email address');
+            showError('Please enter an email address or domain');
+            return;
+        }
+        
+        // Validate format - allow email or @domain.com format
+        if (!email.includes('@')) {
+            showError('Please enter a valid email address or domain (e.g., @domain.com)');
             return;
         }
         
@@ -1295,14 +1304,14 @@ function setupAdminEventListeners() {
                 body: JSON.stringify({ email })
             });
             
-            showSuccess('Email added to whitelist successfully');
+            showSuccess('Email/domain added to whitelist successfully');
             document.getElementById('add-email-form').style.display = 'none';
             document.getElementById('add-email-btn').style.display = 'block';
             document.getElementById('whitelist-email').value = '';
             
             await loadAllowedEmails();
         } catch (error) {
-            showError('Failed to add email to whitelist: ' + error.message);
+            showError('Failed to add email/domain to whitelist: ' + error.message);
         }
     });
 }
