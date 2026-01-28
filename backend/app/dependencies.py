@@ -94,6 +94,13 @@ async def verify_api_key(
             detail="Invalid API key"
         )
     
+    # Check if API key is validated by admin
+    if not api_key.is_validated:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="API key pending admin validation"
+        )
+    
     # Update last used timestamp
     api_key.last_used = datetime.utcnow()
     db.commit()

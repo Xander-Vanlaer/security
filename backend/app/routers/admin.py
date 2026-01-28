@@ -7,13 +7,14 @@ from sqlalchemy import func
 from typing import List, Optional
 from datetime import datetime, timedelta
 from app.database import get_db
-from app.models import User, Region, Hospital, APIKey, SensorData
+from app.models import User, Region, Hospital, APIKey, SensorData, AllowedEmail
 from app.schemas import (
     UserResponse, UserRoleUpdate, UserAssignment,
     RegionCreate, RegionResponse, RegionUpdate,
     HospitalCreate, HospitalResponse, HospitalUpdate,
     APIKeyCreate, APIKeyResponse, MessageResponse,
-    SensorOverviewResponse, SensorStatsResponse, SensorDataResponse
+    SensorOverviewResponse, SensorStatsResponse, SensorDataResponse,
+    AllowedEmailCreate, AllowedEmailResponse
 )
 from app.dependencies import require_admin
 import secrets
@@ -221,7 +222,7 @@ async def create_api_key(
     current_user: User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
-    """Generate API key for hospital (admin only)"""
+    """Generate API key for sensor (admin only)"""
     # Check if hospital exists
     hospital = db.query(Hospital).filter(Hospital.id == api_key_data.hospital_id).first()
     if not hospital:
@@ -230,13 +231,23 @@ async def create_api_key(
             detail="Hospital not found"
         )
     
+    # Check if sensor_id is unique
+    existing_key = db.query(APIKey).filter(APIKey.sensor_id == api_key_data.sensor_id).first()
+    if existing_key:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"API key for sensor '{api_key_data.sensor_id}' already exists"
+        )
+    
     # Generate secure API key
     api_key_value = f"sk_{secrets.token_urlsafe(32)}"
     
     api_key = APIKey(
         key=api_key_value,
+        sensor_id=api_key_data.sensor_id,
         hospital_id=api_key_data.hospital_id,
-        description=api_key_data.description
+        description=api_key_data.description,
+        is_validated=False  # Admin must validate after creation
     )
     db.add(api_key)
     db.commit()
@@ -544,3 +555,82 @@ async def get_sensor_stats(
         inactive_sensors=inactive_count,
         readings_last_24h=readings_24h
     )
+
+
+@router.put("/api-keys/{key_id}/validate", response_model=APIKeyResponse)
+async def validate_api_key(
+    key_id: int,
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """Validate/approve an API key (admin only)"""
+    api_key = db.query(APIKey).filter(APIKey.id == key_id).first()
+    
+    if not api_key:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="API key not found"
+        )
+    
+    api_key.is_validated = True
+    db.commit()
+    db.refresh(api_key)
+    
+    return api_key
+
+
+@router.post("/allowed-emails", response_model=AllowedEmailResponse, status_code=status.HTTP_201_CREATED)
+async def add_allowed_email(
+    email_data: AllowedEmailCreate,
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """Add email to whitelist (admin only)"""
+    # Check if email already exists
+    existing = db.query(AllowedEmail).filter(AllowedEmail.email == email_data.email).first()
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email already in whitelist"
+        )
+    
+    allowed_email = AllowedEmail(
+        email=email_data.email,
+        created_by=current_user.id
+    )
+    db.add(allowed_email)
+    db.commit()
+    db.refresh(allowed_email)
+    
+    return allowed_email
+
+
+@router.get("/allowed-emails", response_model=List[AllowedEmailResponse])
+async def list_allowed_emails(
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """List all whitelisted emails (admin only)"""
+    emails = db.query(AllowedEmail).all()
+    return emails
+
+
+@router.delete("/allowed-emails/{email_id}", response_model=MessageResponse)
+async def delete_allowed_email(
+    email_id: int,
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """Remove email from whitelist (admin only)"""
+    allowed_email = db.query(AllowedEmail).filter(AllowedEmail.id == email_id).first()
+    
+    if not allowed_email:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Email not found in whitelist"
+        )
+    
+    db.delete(allowed_email)
+    db.commit()
+    
+    return MessageResponse(message="Email removed from whitelist successfully")

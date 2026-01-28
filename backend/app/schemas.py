@@ -182,6 +182,7 @@ class SensorDataResponse(BaseModel):
 # API Key Schemas
 class APIKeyCreate(BaseModel):
     """Schema for creating an API key"""
+    sensor_id: str = Field(..., min_length=1, max_length=100)
     hospital_id: int
     description: Optional[str] = None
 
@@ -190,9 +191,11 @@ class APIKeyResponse(BaseModel):
     """Schema for API key response"""
     id: int
     key: str
+    sensor_id: str
     hospital_id: int
     description: Optional[str]
     is_active: bool
+    is_validated: bool
     created_at: datetime
     last_used: Optional[datetime]
     
@@ -240,3 +243,20 @@ class SensorStatsResponse(BaseModel):
     active_sensors: int
     inactive_sensors: int
     readings_last_24h: int
+
+
+# Allowed Email Schemas
+class AllowedEmailCreate(BaseModel):
+    """Schema for adding an email to the whitelist"""
+    email: EmailStr
+
+
+class AllowedEmailResponse(BaseModel):
+    """Schema for allowed email response"""
+    id: int
+    email: str
+    created_at: datetime
+    created_by: Optional[int]
+    
+    class Config:
+        from_attributes = True

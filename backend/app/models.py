@@ -89,11 +89,23 @@ class APIKey(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     key = Column(String(255), unique=True, nullable=False, index=True)
+    sensor_id = Column(String(100), unique=True, nullable=False, index=True)
     hospital_id = Column(Integer, ForeignKey("hospitals.id"), nullable=False)
     description = Column(String(200), nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
+    is_validated = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     last_used = Column(DateTime, nullable=True)
+
+
+class AllowedEmail(Base):
+    """Email whitelist for registration"""
+    __tablename__ = "allowed_emails"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String(100), unique=True, nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=True)
 
 
 class DataItem(Base):

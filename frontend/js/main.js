@@ -125,6 +125,7 @@ async function showAdminDashboard() {
         await loadRegions();
         await loadHospitals();
         await loadAPIKeys();
+        await loadAllowedEmails();
         setupAdminEventListeners();
     }
 }
@@ -473,7 +474,8 @@ async function loadHospitalSensorData() {
 }
 
 // Display sensor data in table
-function displaySensorData(elementId, sensorData) {
+// Display sensor data in table
+async function displaySensorData(elementId, sensorData) {
     const element = document.getElementById(elementId);
     
     if (!sensorData || sensorData.length === 0) {
@@ -481,32 +483,70 @@ function displaySensorData(elementId, sensorData) {
         return;
     }
     
-    element.innerHTML = `
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th>Sensor ID</th>
-                    <th>Hospital ID</th>
-                    <th>Temperature</th>
-                    <th>Humidity</th>
-                    <th>Air Quality</th>
-                    <th>Timestamp</th>
-                </tr>
-            </thead>
-            <tbody>
-                ${sensorData.map(data => `
+    // Fetch hospitals to get names
+    try {
+        const hospitals = await apiClient.request('/api/admin/hospitals');
+        const hospitalMap = {};
+        hospitals.forEach(h => {
+            hospitalMap[h.id] = h.name;
+        });
+        
+        element.innerHTML = `
+            <table class="data-table">
+                <thead>
                     <tr>
-                        <td>${escapeHtml(data.sensor_id)}</td>
-                        <td>${data.hospital_id}</td>
-                        <td>${data.temperature !== null ? data.temperature.toFixed(1) + '°C' : 'N/A'}</td>
-                        <td>${data.humidity !== null ? data.humidity.toFixed(1) + '%' : 'N/A'}</td>
-                        <td>${data.air_quality !== null ? data.air_quality.toFixed(0) : 'N/A'}</td>
-                        <td>${new Date(data.timestamp).toLocaleString()}</td>
+                        <th>Sensor ID</th>
+                        <th>Hospital</th>
+                        <th>Temperature</th>
+                        <th>Humidity</th>
+                        <th>Air Quality</th>
+                        <th>Timestamp</th>
                     </tr>
-                `).join('')}
-            </tbody>
-        </table>
-    `;
+                </thead>
+                <tbody>
+                    ${sensorData.map(data => `
+                        <tr>
+                            <td><strong>${escapeHtml(data.sensor_id)}</strong></td>
+                            <td>${hospitalMap[data.hospital_id] || `ID: ${data.hospital_id}`}</td>
+                            <td>${data.temperature !== null ? data.temperature.toFixed(1) + '°C' : 'N/A'}</td>
+                            <td>${data.humidity !== null ? data.humidity.toFixed(1) + '%' : 'N/A'}</td>
+                            <td>${data.air_quality !== null ? data.air_quality.toFixed(0) : 'N/A'}</td>
+                            <td>${new Date(data.timestamp).toLocaleString()}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        `;
+    } catch (error) {
+        console.error('Failed to fetch hospital names:', error);
+        // Fallback to showing hospital IDs
+        element.innerHTML = `
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Sensor ID</th>
+                        <th>Hospital ID</th>
+                        <th>Temperature</th>
+                        <th>Humidity</th>
+                        <th>Air Quality</th>
+                        <th>Timestamp</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${sensorData.map(data => `
+                        <tr>
+                            <td><strong>${escapeHtml(data.sensor_id)}</strong></td>
+                            <td>${data.hospital_id}</td>
+                            <td>${data.temperature !== null ? data.temperature.toFixed(1) + '°C' : 'N/A'}</td>
+                            <td>${data.humidity !== null ? data.humidity.toFixed(1) + '%' : 'N/A'}</td>
+                            <td>${data.air_quality !== null ? data.air_quality.toFixed(0) : 'N/A'}</td>
+                            <td>${new Date(data.timestamp).toLocaleString()}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        `;
+    }
 }
 
 // Set up event listeners
@@ -839,7 +879,14 @@ async function viewSensorDetails(sensorId, hospitalId) {
 async function loadAPIKeys() {
     try {
         const apiKeys = await apiClient.request('/api/admin/api-keys');
+        const hospitals = await apiClient.request('/api/admin/hospitals');
         const listElement = document.getElementById('api-keys-list');
+        
+        // Create hospital ID to name mapping
+        const hospitalMap = {};
+        hospitals.forEach(h => {
+            hospitalMap[h.id] = h.name;
+        });
         
         if (!apiKeys || apiKeys.length === 0) {
             listElement.innerHTML = '<p>No API keys found. Generate one to get started.</p>';
@@ -850,10 +897,12 @@ async function loadAPIKeys() {
             <table class="data-table">
                 <thead>
                     <tr>
+                        <th>Sensor ID</th>
                         <th>Key (truncated)</th>
-                        <th>Hospital ID</th>
+                        <th>Hospital</th>
                         <th>Description</th>
                         <th>Status</th>
+                        <th>Validated</th>
                         <th>Created</th>
                         <th>Last Used</th>
                         <th>Actions</th>
@@ -862,13 +911,20 @@ async function loadAPIKeys() {
                 <tbody>
                     ${apiKeys.map(key => `
                         <tr>
-                            <td><code>${escapeHtml(key.key.substring(0, 20))}...</code></td>
-                            <td>${key.hospital_id}</td>
+                            <td><strong>${escapeHtml(key.sensor_id)}</strong></td>
+                            <td><code>${escapeHtml(key.key.substring(0, 12))}...</code></td>
+                            <td>${hospitalMap[key.hospital_id] || `ID: ${key.hospital_id}`}</td>
                             <td>${escapeHtml(key.description || 'N/A')}</td>
                             <td>
                                 <span class="status-badge ${key.is_active ? 'status-active' : 'status-inactive'}">
                                     ${key.is_active ? 'Active' : 'Revoked'}
                                 </span>
+                            </td>
+                            <td>
+                                ${key.is_validated 
+                                    ? '<span class="status-badge status-active">✓ Validated</span>' 
+                                    : `<button class="btn btn-small btn-primary" onclick="validateAPIKey(${key.id})">Validate</button>`
+                                }
                             </td>
                             <td>${new Date(key.created_at).toLocaleDateString()}</td>
                             <td>${key.last_used ? new Date(key.last_used).toLocaleString() : 'Never'}</td>
@@ -885,6 +941,17 @@ async function loadAPIKeys() {
     }
 }
 
+// Validate API key - global function for onclick
+async function validateAPIKey(keyId) {
+    try {
+        await apiClient.request(`/api/admin/api-keys/${keyId}/validate`, { method: 'PUT' });
+        showSuccess('API key validated successfully');
+        await loadAPIKeys();
+    } catch (error) {
+        showError('Failed to validate API key: ' + error.message);
+    }
+}
+
 // Revoke API key - global function for onclick
 async function revokeAPIKey(keyId) {
     if (!confirm('Are you sure you want to revoke this API key? This action cannot be undone.')) {
@@ -897,6 +964,59 @@ async function revokeAPIKey(keyId) {
         await loadAPIKeys();
     } catch (error) {
         showError('Failed to revoke API key: ' + error.message);
+    }
+}
+
+// Load allowed emails
+async function loadAllowedEmails() {
+    try {
+        const emails = await apiClient.request('/api/admin/allowed-emails');
+        const listElement = document.getElementById('allowed-emails-list');
+        
+        if (!emails || emails.length === 0) {
+            listElement.innerHTML = '<p>No whitelisted emails found. Add one to allow registrations.</p>';
+            return;
+        }
+        
+        listElement.innerHTML = `
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Email</th>
+                        <th>Added</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${emails.map(email => `
+                        <tr>
+                            <td><strong>${escapeHtml(email.email)}</strong></td>
+                            <td>${new Date(email.created_at).toLocaleDateString()}</td>
+                            <td>
+                                <button class="btn btn-small btn-danger" onclick="deleteAllowedEmail(${email.id})">Remove</button>
+                            </td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        `;
+    } catch (error) {
+        console.error('Failed to load allowed emails:', error);
+    }
+}
+
+// Delete allowed email - global function for onclick
+async function deleteAllowedEmail(emailId) {
+    if (!confirm('Are you sure you want to remove this email from the whitelist?')) {
+        return;
+    }
+    
+    try {
+        await apiClient.request(`/api/admin/allowed-emails/${emailId}`, { method: 'DELETE' });
+        showSuccess('Email removed from whitelist successfully');
+        await loadAllowedEmails();
+    } catch (error) {
+        showError('Failed to remove email: ' + error.message);
     }
 }
 
@@ -1077,11 +1197,13 @@ function setupAdminEventListeners() {
         document.getElementById('add-api-key-form').style.display = 'none';
         document.getElementById('add-api-key-btn').style.display = 'block';
         document.getElementById('api-key-hospital').value = '';
+        document.getElementById('api-key-sensor-id').value = '';
         document.getElementById('api-key-description').value = '';
     });
     
     document.getElementById('save-api-key-btn')?.addEventListener('click', async () => {
         const hospital_id = parseInt(document.getElementById('api-key-hospital').value);
+        const sensor_id = document.getElementById('api-key-sensor-id').value.trim();
         const description = document.getElementById('api-key-description').value;
         
         if (!hospital_id) {
@@ -1089,10 +1211,15 @@ function setupAdminEventListeners() {
             return;
         }
         
+        if (!sensor_id) {
+            showError('Please enter a sensor ID');
+            return;
+        }
+        
         try {
             const result = await apiClient.request('/api/admin/api-keys', {
                 method: 'POST',
-                body: JSON.stringify({ hospital_id, description: description || null })
+                body: JSON.stringify({ sensor_id, hospital_id, description: description || null })
             });
             
             // Show the generated key in a modal with copy functionality
@@ -1103,6 +1230,11 @@ function setupAdminEventListeners() {
                 <div style="background: #fff3cd; border: 1px solid #ffc107; padding: 1rem; border-radius: 4px; margin: 1rem 0;">
                     <p style="margin: 0; font-weight: bold;">⚠️ IMPORTANT: Save this key securely!</p>
                     <p style="margin: 0.5rem 0 0 0;">This key will only be shown once and cannot be retrieved later.</p>
+                    <p style="margin: 0.5rem 0 0 0; color: #856404;">⚠️ Key requires admin validation before it can be used.</p>
+                </div>
+                <div class="form-group">
+                    <label><strong>Sensor ID:</strong></label>
+                    <input type="text" value="${escapeHtml(result.sensor_id)}" readonly style="font-family: monospace;">
                 </div>
                 <div class="form-group">
                     <label><strong>API Key:</strong></label>
@@ -1112,7 +1244,7 @@ function setupAdminEventListeners() {
                     </div>
                 </div>
                 <p style="margin-top: 1rem;">Use this key in the <code>X-API-Key</code> header when sending sensor data.</p>
-                <p>Example: <code>X-API-Key: ${escapeHtml(result.key)}</code></p>
+                <p>The sensor_id in your data must match: <code>${escapeHtml(result.sensor_id)}</code></p>
             `;
             modal.style.display = 'block';
             
@@ -1128,11 +1260,49 @@ function setupAdminEventListeners() {
             document.getElementById('add-api-key-form').style.display = 'none';
             document.getElementById('add-api-key-btn').style.display = 'block';
             document.getElementById('api-key-hospital').value = '';
+            document.getElementById('api-key-sensor-id').value = '';
             document.getElementById('api-key-description').value = '';
             
             await loadAPIKeys();
         } catch (error) {
             showError('Failed to generate API key: ' + error.message);
+        }
+    });
+    
+    // Email whitelist management buttons
+    document.getElementById('add-email-btn')?.addEventListener('click', () => {
+        document.getElementById('add-email-form').style.display = 'block';
+        document.getElementById('add-email-btn').style.display = 'none';
+    });
+    
+    document.getElementById('cancel-email-btn')?.addEventListener('click', () => {
+        document.getElementById('add-email-form').style.display = 'none';
+        document.getElementById('add-email-btn').style.display = 'block';
+        document.getElementById('whitelist-email').value = '';
+    });
+    
+    document.getElementById('save-email-btn')?.addEventListener('click', async () => {
+        const email = document.getElementById('whitelist-email').value.trim();
+        
+        if (!email) {
+            showError('Please enter an email address');
+            return;
+        }
+        
+        try {
+            await apiClient.request('/api/admin/allowed-emails', {
+                method: 'POST',
+                body: JSON.stringify({ email })
+            });
+            
+            showSuccess('Email added to whitelist successfully');
+            document.getElementById('add-email-form').style.display = 'none';
+            document.getElementById('add-email-btn').style.display = 'block';
+            document.getElementById('whitelist-email').value = '';
+            
+            await loadAllowedEmails();
+        } catch (error) {
+            showError('Failed to add email to whitelist: ' + error.message);
         }
     });
 }
