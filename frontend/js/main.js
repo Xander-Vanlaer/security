@@ -1095,8 +1095,34 @@ function setupAdminEventListeners() {
                 body: JSON.stringify({ hospital_id, description: description || null })
             });
             
-            // Show the generated key to the user
-            alert(`API Key Generated!\n\nKey: ${result.key}\n\nIMPORTANT: Save this key securely. It will not be shown again!`);
+            // Show the generated key in a modal with copy functionality
+            const modal = document.getElementById('sensor-modal');
+            const content = document.getElementById('sensor-modal-content');
+            content.innerHTML = `
+                <h3 style="color: #4CAF50;">✓ API Key Generated Successfully</h3>
+                <div style="background: #fff3cd; border: 1px solid #ffc107; padding: 1rem; border-radius: 4px; margin: 1rem 0;">
+                    <p style="margin: 0; font-weight: bold;">⚠️ IMPORTANT: Save this key securely!</p>
+                    <p style="margin: 0.5rem 0 0 0;">This key will only be shown once and cannot be retrieved later.</p>
+                </div>
+                <div class="form-group">
+                    <label><strong>API Key:</strong></label>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <input type="text" id="generated-api-key" value="${escapeHtml(result.key)}" readonly style="flex: 1; font-family: monospace;">
+                        <button id="copy-api-key-btn" class="btn btn-primary">Copy</button>
+                    </div>
+                </div>
+                <p style="margin-top: 1rem;">Use this key in the <code>X-API-Key</code> header when sending sensor data.</p>
+                <p>Example: <code>X-API-Key: ${escapeHtml(result.key)}</code></p>
+            `;
+            modal.style.display = 'block';
+            
+            // Add copy functionality
+            document.getElementById('copy-api-key-btn').addEventListener('click', () => {
+                const keyInput = document.getElementById('generated-api-key');
+                keyInput.select();
+                document.execCommand('copy');
+                showSuccess('API key copied to clipboard!');
+            });
             
             showSuccess('API key generated successfully');
             document.getElementById('add-api-key-form').style.display = 'none';

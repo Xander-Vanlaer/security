@@ -419,15 +419,18 @@ async def get_sensors_overview(
     hospital_id: Optional[int] = None,
     region_id: Optional[int] = None,
     sensor_id: Optional[str] = None,
+    limit: int = 100,
+    offset: int = 0,
     current_user: User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
     """Get overview of all sensors with latest readings and status (admin only)"""
-    # Get distinct sensors with their latest reading
+    # Get distinct sensors with their latest reading and total count in one query
     subquery = db.query(
         SensorData.sensor_id,
         SensorData.hospital_id,
-        func.max(SensorData.timestamp).label('latest_timestamp')
+        func.max(SensorData.timestamp).label('latest_timestamp'),
+        func.count(SensorData.id).label('total_readings')
     ).group_by(SensorData.sensor_id, SensorData.hospital_id)
     
     if hospital_id:
@@ -438,7 +441,10 @@ async def get_sensors_overview(
     subquery = subquery.subquery()
     
     # Join to get full sensor data
-    query = db.query(SensorData).join(
+    query = db.query(
+        SensorData,
+        subquery.c.total_readings
+    ).join(
         subquery,
         (SensorData.sensor_id == subquery.c.sensor_id) &
         (SensorData.hospital_id == subquery.c.hospital_id) &
@@ -448,19 +454,14 @@ async def get_sensors_overview(
     if region_id:
         query = query.filter(Hospital.region_id == region_id)
     
-    latest_readings = query.all()
+    # Add pagination
+    results = query.order_by(SensorData.timestamp.desc()).offset(offset).limit(limit).all()
     
     # Build overview response
     overview = []
     one_hour_ago = datetime.utcnow() - timedelta(hours=1)
     
-    for reading in latest_readings:
-        # Get total readings count for this sensor
-        total_readings = db.query(func.count(SensorData.id)).filter(
-            SensorData.sensor_id == reading.sensor_id,
-            SensorData.hospital_id == reading.hospital_id
-        ).scalar()
-        
+    for reading, total_readings in results:
         # Determine if sensor is active (data in last hour)
         is_active = reading.timestamp >= one_hour_ago
         
@@ -526,19 +527,16 @@ async def get_sensor_stats(
         SensorData.timestamp >= one_hour_ago
     ).scalar() or 0
     
-    # Inactive sensors (no data in last 24 hours)
-    # Get all distinct sensors
-    all_sensors = db.query(
-        func.distinct(SensorData.sensor_id)
-    ).all()
+    # Inactive sensors - sensors with latest reading older than 24 hours
+    # Use a subquery to get the latest timestamp for each sensor
+    latest_per_sensor = db.query(
+        SensorData.sensor_id,
+        func.max(SensorData.timestamp).label('latest_timestamp')
+    ).group_by(SensorData.sensor_id).subquery()
     
-    inactive_count = 0
-    for (sensor,) in all_sensors:
-        latest = db.query(func.max(SensorData.timestamp)).filter(
-            SensorData.sensor_id == sensor
-        ).scalar()
-        if latest and latest < twenty_four_hours_ago:
-            inactive_count += 1
+    inactive_count = db.query(func.count()).select_from(latest_per_sensor).filter(
+        latest_per_sensor.c.latest_timestamp < twenty_four_hours_ago
+    ).scalar() or 0
     
     return SensorStatsResponse(
         total_sensors=total_sensors,
