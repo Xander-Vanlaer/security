@@ -111,7 +111,7 @@ function checkAuth() {
     if (!TokenManager.isAuthenticated() && !isLoginPage) {
         window.location.href = 'login.html';
     } else if (TokenManager.isAuthenticated() && isLoginPage) {
-        window.location.href = 'index.html';
+        window.location.href = 'dashboard.html';
     }
 }
 
@@ -181,7 +181,7 @@ if (window.location.pathname.includes('login.html')) {
                     } else {
                         // Login successful
                         TokenManager.setTokens(data.access_token, data.refresh_token);
-                        window.location.href = 'index.html';
+                        window.location.href = 'dashboard.html';
                     }
                 } else if (totpCode) {
                     // 2FA verification
@@ -198,7 +198,7 @@ if (window.location.pathname.includes('login.html')) {
                     }
                     
                     TokenManager.setTokens(data.access_token, data.refresh_token);
-                    window.location.href = 'index.html';
+                    window.location.href = 'dashboard.html';
                 }
             } catch (error) {
                 errorDiv.textContent = error.message;

@@ -260,3 +260,20 @@ class AllowedEmailResponse(BaseModel):
     
     class Config:
         from_attributes = True
+
+
+# Allowed Domain Schemas
+class AllowedDomainCreate(BaseModel):
+    """Schema for adding a domain to the whitelist"""
+    domain: str = Field(..., pattern=r'^@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
+
+
+class AllowedDomainResponse(BaseModel):
+    """Schema for allowed domain response"""
+    id: int
+    domain: str
+    created_at: datetime
+    created_by: Optional[int]
+    
+    class Config:
+        from_attributes = True
